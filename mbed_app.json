@@ -1,0 +1,25 @@
+{
+    "config": {
+        "camera":{
+            "help": "0:disable 1:enable",
+            "value": "1"
+        },
+        "lcd":{
+            "help": "0:disable 1:enable",
+            "value": "0"
+        },
+        "usb-host-ch":{
+            "help": "(for GR-PEACH) 0:ch0 1:ch1",
+            "value": "1"
+        },
+        "audio-camera-shield":{
+            "help": "(for GR-PEACH) 0:use 1:not use",
+            "value": "1"
+        }
+    },
+    "target_overrides": {
+        "*": {
+            "target.macros_add": ["HAVE_OPENCV_IMGCODECS"]
+        }
+    }
+}
