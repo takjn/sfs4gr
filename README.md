@@ -45,4 +45,16 @@ camera-typeを指定しない場合は以下の設定となります。
 * GR-PEACH、カメラ：CAMERA_MT9V111  
 * GR-LYCHEE、カメラ：CAMERA_OV7725  
 
+***mbed CLI以外の環境で使用する場合***  
+mbed CLI以外の環境をお使いの場合、``mbed_app.json``の変更は反映されません。  
+``mbed_config.h``に以下のようにマクロを追加してください。  
+```cpp
+#define MBED_CONF_APP_CAMERA                        1    // set by application
+#define MBED_CONF_APP_CAMERA_TYPE                   CAMERA_CVBS             // set by application
+#define MBED_CONF_APP_LCD                           0    // set by application
+#define MBED_CONF_APP_USB_HOST_CH                   1    // set by application
+#define MBED_CONF_APP_AUDIO_CAMERA_SHIELD           1    // set by application
+#define HAVE_OPENCV_IMGCODECS
+```
+
 カメラ画像をLCDやWindows用PCアプリで表示する場合は [GR-Boads_Camera_LCD_sample](https://github.com/d-kato/GR-Boads_Camera_LCD_sample) を参照ください。  
