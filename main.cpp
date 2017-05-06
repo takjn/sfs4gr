@@ -8,7 +8,7 @@
 
 #define MOUNT_NAME             "storage"
 
-#define DBG_PCMONITOR (1)
+#define DBG_PCMONITOR (0)
 #if (DBG_PCMONITOR == 1)
 /* For viewing image on PC */
 static DisplayApp  display_app;
@@ -47,11 +47,16 @@ static uint8_t JpegBuffer[1024 * 63]__attribute((aligned(32)));
 #endif
 
 DisplayBase Display;
+DigitalIn   button_shutter(D10);
 DigitalIn   button0(USER_BUTTON0);
 DigitalIn   button1(USER_BUTTON1);
 DigitalOut  led1(LED1);
 DigitalOut  led2(LED2);
+DigitalOut  led3(LED3);
+DigitalOut  led4(LED4);
 
+static cv::Mat intrinsic, distortion;
+  
 static void save_image_bmp(void) {
     // Transform buffer into OpenCV Mat
     cv::Mat img_yuv(VIDEO_PIXEL_VW, VIDEO_PIXEL_HW, CV_8UC2, user_frame_buffer0);
@@ -60,9 +65,16 @@ static void save_image_bmp(void) {
     cv::Mat img_gray;
     cv::cvtColor(img_yuv, img_gray, CV_YUV2GRAY_YUY2);
 
+    cv::Mat img_gray_dst;
+    cv::undistort(img_gray, img_gray_dst, intrinsic, distortion);
+
     char file_name[32];
-    sprintf(file_name, "/"MOUNT_NAME"/img_%d.bmp", file_name_index++);
+    sprintf(file_name, "/"MOUNT_NAME"/img_%d.bmp", file_name_index);
     cv::imwrite(file_name, img_gray);
+    printf("Saved file %s\r\n", file_name);
+
+    sprintf(file_name, "/"MOUNT_NAME"/dst_%d.bmp", file_name_index);
+    cv::imwrite(file_name, img_gray_dst);
     printf("Saved file %s\r\n", file_name);
 }
 
@@ -87,7 +99,7 @@ static void save_image_jpg(void) {
     }
 
     char file_name[32];
-    sprintf(file_name, "/"MOUNT_NAME"/img_%d.jpg", file_name_index++);
+    sprintf(file_name, "/"MOUNT_NAME"/img_%d.jpg", file_name_index);
     FILE * fp = fopen(file_name, "w");
     fwrite(JpegBuffer, sizeof(char), (int)jcu_encode_size, fp);
     fclose(fp);
@@ -140,6 +152,52 @@ uint8_t* get_jpeg_adr(){
     return JpegBuffer;
 }
 
+
+// harf step (400 steps)
+#define STEPPER_WAIT 0.004
+
+DigitalOut A4988STEP(D8);
+DigitalOut A4988DIR(D9);
+
+int setup() {
+    A4988DIR = 0;
+    A4988STEP = 0;
+
+    // cv::FileStorage fs("/storage/camera.xml", cv::FileStorage::READ);
+    // if (!fs.isOpened()){
+    //     cout << "camera.xml open error" << endl;
+    //     return -1;
+    // }
+
+    // fs["intrinsic"] >> intrinsic;
+    // fs["distortion"] >> distortion;
+    // fs.release();
+
+    // cout << "camera matrix: " << intrinsic << endl
+    //      << "distortion coeffs: " << distortion << endl;
+    intrinsic = (cv::Mat_<double>(3,3) << 367.879585, 0.000000, 314.035869, 0.000000, 367.582735, 234.664545, 0.000000, 0.000000, 1.000000);
+    distortion = (cv::Mat_<double>(1,4) << -0.333848, 0.165991, 0.000608, -0.001805 );
+
+    return 0;
+}
+
+void rotate(int steps) {
+    A4988DIR = 1;
+    if (steps < 0) {
+        A4988DIR = 0;
+        steps = -steps;
+    }
+
+    for (int i=0;i<steps;i++) {
+        led2=1;
+        A4988STEP = 1;
+        wait(STEPPER_WAIT);
+        led2=0;
+        A4988STEP = 0;
+        wait(STEPPER_WAIT);
+    }
+}
+
 int main() {
     // Initialize the background to black
     for (int i = 0; i < sizeof(user_frame_buffer0); i += 2) {
@@ -150,21 +208,42 @@ int main() {
     // Camera
     EasyAttach_Init(Display);
     Start_Video_Camera();
+    led4 = 1;
 
     // SD & USB
     SdUsbConnect storage(MOUNT_NAME);
 
+    storage.wait_connect();
+    setup();
+    led3 = 1;
+
+    button_shutter.mode(PullUp);
+
     while (1) {
         storage.wait_connect();
+        // if (button_shutter == 0) {
+        //     led1 = 1;
+        //     save_image_bmp(); // save as bitmap
+        //     save_image_jpg(); // save as jpeg
+        //     led1 = 0;
+        // }
+
         if (button0 == 0) {
             led1 = 1;
             save_image_bmp(); // save as bitmap
+            save_image_jpg(); // save as jpeg
             led1 = 0;
+            file_name_index++;
         }
         if (button1 == 0) {
-            led2 = 1;
-            save_image_jpg(); // save as jpeg
-            led2 = 0;
+            for (int i=0;i<80;i++) {
+                led1 = 1;
+                save_image_bmp(); // save as bitmap
+                save_image_jpg(); // save as jpeg
+                led1 = 0;
+                rotate(10);
+                file_name_index++;
+            }
         }
 
 #if (DBG_PCMONITOR == 1)
