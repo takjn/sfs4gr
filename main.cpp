@@ -1,12 +1,19 @@
-
 #include "mbed.h"
 #include "EasyAttach_CameraAndLCD.h"
 #include "SdUsbConnect.h"
 #include "JPEG_Converter.h"
 #include "dcache-control.h"
 #include "opencv2/opencv.hpp"
+#include "DisplayApp.h"
 
 #define MOUNT_NAME             "storage"
+
+#define DBG_PCMONITOR (1)
+#if (DBG_PCMONITOR == 1)
+/* For viewing image on PC */
+static DisplayApp  display_app;
+#endif
+
 
 /* Video input and LCD layer 0 output */
 #define VIDEO_FORMAT           (DisplayBase::VIDEO_FORMAT_YCBCR422)
@@ -102,6 +109,37 @@ static void Start_Video_Camera(void) {
     EasyAttach_CameraStart(Display, DisplayBase::VIDEO_INPUT_CHANNEL_0);
 }
 
+
+size_t encode_jpeg(uint8_t* buf, int len, int width, int height, uint8_t* inbuf) {
+    size_t encode_size;
+    JPEG_Converter::bitmap_buff_info_t bitmap_buff_info;
+    JPEG_Converter::encode_options_t encode_options;
+    bitmap_buff_info.width = width;
+    bitmap_buff_info.height = height;
+    bitmap_buff_info.format = JPEG_Converter::WR_RD_YCbCr422;
+    bitmap_buff_info.buffer_address = (void *) inbuf;
+    encode_options.encode_buff_size = len;
+    encode_options.p_EncodeCallBackFunc = NULL;
+    encode_options.input_swapsetting = JPEG_Converter::WR_RD_WRSWA_32_16_8BIT;
+
+    encode_size = 0;
+    dcache_invalid(buf, len);
+    if (Jcu.encode(&bitmap_buff_info, buf, &encode_size, &encode_options)
+            != JPEG_Converter::JPEG_CONV_OK) {
+        encode_size = 0;
+    }
+
+    return encode_size;
+}
+
+size_t create_jpeg(){
+    return encode_jpeg(JpegBuffer, sizeof(JpegBuffer), VIDEO_PIXEL_HW, VIDEO_PIXEL_VW, user_frame_buffer0);
+}
+
+uint8_t* get_jpeg_adr(){
+    return JpegBuffer;
+}
+
 int main() {
     // Initialize the background to black
     for (int i = 0; i < sizeof(user_frame_buffer0); i += 2) {
@@ -128,6 +166,11 @@ int main() {
             save_image_jpg(); // save as jpeg
             led2 = 0;
         }
+
+#if (DBG_PCMONITOR == 1)
+        size_t jpeg_size = create_jpeg();
+        display_app.SendJpeg(get_jpeg_adr(), jpeg_size);
+#endif
+
     }
 }
-
