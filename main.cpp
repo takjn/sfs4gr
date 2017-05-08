@@ -56,8 +56,26 @@ DigitalOut  led3(LED3);
 DigitalOut  led4(LED4);
 
 static cv::Mat intrinsic, distortion;
-  
+static cv::Mat img_background;
+static bool has_background = false;
+
+static void set_background(void) {
+    // Transform buffer into OpenCV Mat
+    cv::Mat img_yuv(VIDEO_PIXEL_VW, VIDEO_PIXEL_HW, CV_8UC2, user_frame_buffer0);
+
+    // Convert from YUV422 to grayscale
+    cv::cvtColor(img_yuv, img_background, CV_YUV2GRAY_YUY2);
+
+    // set flag
+    has_background = true;
+    led3 = 1;
+}
+
 static void save_image_bmp(void) {
+    if (!has_background) {
+        return;
+    }
+
     // Transform buffer into OpenCV Mat
     cv::Mat img_yuv(VIDEO_PIXEL_VW, VIDEO_PIXEL_HW, CV_8UC2, user_frame_buffer0);
 
@@ -65,16 +83,21 @@ static void save_image_bmp(void) {
     cv::Mat img_gray;
     cv::cvtColor(img_yuv, img_gray, CV_YUV2GRAY_YUY2);
 
-    cv::Mat img_gray_dst;
-    cv::undistort(img_gray, img_gray_dst, intrinsic, distortion);
+    // Remove background
+    cv::Mat diff, dst;
+    cv::absdiff(img_gray, img_background, diff);
+    // cv::threshold(diff, img_gray, 5, 255, cv::THRESH_BINARY);
+    cv::threshold(diff, img_gray, 0, 255, cv::THRESH_BINARY | cv::THRESH_OTSU);
+
+    // // Filter dot noise
+    // cv::medianBlur(img_gray, img_gray, 5);
+
+    // Undistort
+    // cv::undistort(img_gray, dst, intrinsic, distortion);
 
     char file_name[32];
     sprintf(file_name, "/"MOUNT_NAME"/img_%d.bmp", file_name_index);
     cv::imwrite(file_name, img_gray);
-    printf("Saved file %s\r\n", file_name);
-
-    sprintf(file_name, "/"MOUNT_NAME"/dst_%d.bmp", file_name_index);
-    cv::imwrite(file_name, img_gray_dst);
     printf("Saved file %s\r\n", file_name);
 }
 
@@ -173,75 +196,11 @@ int setup() {
     // fs["distortion"] >> distortion;
     // fs.release();
 
-    // cout << "camera matrix: " << intrinsic << endl
-    //      << "distortion coeffs: " << distortion << endl;
     intrinsic = (cv::Mat_<double>(3,3) << 367.879585, 0.000000, 314.035869, 0.000000, 367.582735, 234.664545, 0.000000, 0.000000, 1.000000);
-    distortion = (cv::Mat_<double>(1,5) << -0.333848, 0.165991, 0.000608, -0.001805, 0);
+    distortion = (cv::Mat_<double>(1,4) << -0.333848, 0.165991, 0.000608, -0.001805);
 
-
-// cv::Mat rvec = (cv::Mat_<double>(3, 1) << 0.0, 0.0, 0.0 );
-// cv::Mat tvec = (cv::Mat_<double>(3, 1) << 0.0, 0.0, 0.0 );
-cv::Mat xyz = (cv::Mat_<double>(4, 1) << 3.0, 4.0, 5.0, 1.0 );
-vector<cv::Point2f> pt;
-// cv::projectPoints(xyz, rvec, tvec, intrinsic, distortion, pt);
-
-
-// X = A.cross(B)
-
-// 0.990820  0.115340  0.070516  27.593584
-// 0.118059  -0.992365  -0.035681  21.710029
-// 0.065862  0.043679  -0.996872  49.612615
-// 0.000000  0.000000  0.000000  1.000000
-
-
-cv::Mat vec, cc;
-
-xyz = (cv::Mat_<double>(4, 1) << 0.0, 0.0, 0.0, 1.0 );
-vec = (cv::Mat_<double>(3, 4) << 0.01114, 0.0, 0.0, 80.0,   0.0, -0.01114, 0.0, 60.0,   0.0, 0.0, -0.01114, 50.0);
-cc = intrinsic*vec*xyz;
-std::cout << "2d points 1" << cc << std::endl;
-
-// xyz = (cv::Mat_<double>(4, 1) << 0.0, 0.0, 0.0, 1.0 );
-// vec = (cv::Mat_<double>(3, 4) << 0.01114, 0.0, 0.0, 80.0,   0.0, 0.01115, 0.0, 60.0,   0.0, 0.0, 0.01114, -50.0);
-// cc = intrinsic*vec*xyz;
-// std::cout << "2d points 1" << cc << std::endl;
-
-// xyz = (cv::Mat_<double>(4, 1) << 10.0, 0.0, 0.0, 1.0 );
-// vec = (cv::Mat_<double>(3, 4) << 0.01114, 0.0, 0.0, 80.0,   0.0, 0.01115, 0.0, 60.0,   0.0, 0.0, 0.01114, -50.0);
-// cc = intrinsic*vec*xyz;
-// std::cout << "2d points 2" << cc << std::endl;
-
-// xyz = (cv::Mat_<double>(4, 1) << 20.0, 0.0, 0.0, 1.0 );
-// vec = (cv::Mat_<double>(3, 4) << 0.01114, 0.0, 0.0, 80.0,   0.0, 0.01115, 0.0, 60.0,   0.0, 0.0, 0.01114, -50.0);
-// cc = intrinsic*vec*xyz;
-// std::cout << "2d points 3" << cc << std::endl;
-
-// xyz = (cv::Mat_<double>(4, 1) << 0.0, 10.0, 0.0, 1.0 );
-// vec = (cv::Mat_<double>(3, 4) << 0.01114, 0.0, 0.0, 80.0,   0.0, 0.01115, 0.0, 60.0,   0.0, 0.0, 0.01114, -50.0);
-// cc = intrinsic*vec*xyz;
-// std::cout << "2d points 4" << cc << std::endl;
-
-// xyz = (cv::Mat_<double>(4, 1) << 0.0, 20.0, 0.0, 1.0 );
-// vec = (cv::Mat_<double>(3, 4) << 0.01114, 0.0, 0.0, 80.0,   0.0, 0.01115, 0.0, 60.0,   0.0, 0.0, 0.01114, -50.0);
-// cc = intrinsic*vec*xyz;
-// std::cout << "2d points 5" << cc << std::endl;
-
-
-// cv::Mat aa = vec*xyz;
-// cv::Mat bb = intrinsic*aa;
-// cv::Mat cc = intrinsic*vec*xyz;
-
-// std::cout << "3d points " << xyz << std::endl;
-// std::cout << "3d points " << aa << std::endl;
-// std::cout << "2d points " << bb << std::endl;
-// std::cout << "2d points " << cc << std::endl;
-
-// cv::Mat aa = vec*xyz;
-// // cv::Mat bb = intrinsic*aa;
-// std::cout << "3d points " << xyz << std::endl;
-// std::cout << "vec " << vec << std::endl;
-// std::cout << "2d points " << aa << std::endl;
-// // std::cout << "2d points " << bb << std::endl;
+    cout << "camera matrix: " << intrinsic << endl
+         << "distortion coeffs: " << distortion << endl;
 
     return 0;
 }
@@ -277,10 +236,8 @@ int main() {
 
     // SD & USB
     SdUsbConnect storage(MOUNT_NAME);
-
     storage.wait_connect();
     setup();
-    led3 = 1;
 
     button_shutter.mode(PullUp);
 
@@ -295,20 +252,24 @@ int main() {
 
         if (button0 == 0) {
             led1 = 1;
+            set_background(); // get background image
+            led1 = 0;
+        }
+        if (button1 == 0) {
+            led1 = 1;
             save_image_bmp(); // save as bitmap
             save_image_jpg(); // save as jpeg
             led1 = 0;
             file_name_index++;
-        }
-        if (button1 == 0) {
-            for (int i=0;i<80;i++) {
-                led1 = 1;
-                save_image_bmp(); // save as bitmap
-                save_image_jpg(); // save as jpeg
-                led1 = 0;
-                rotate(10);
-                file_name_index++;
-            }
+
+            // for (int i=0;i<80;i++) {
+            //     led1 = 1;
+            //     save_image_bmp(); // save as bitmap
+            //     save_image_jpg(); // save as jpeg
+            //     led1 = 0;
+            //     rotate(10);
+            //     file_name_index++;
+            // }
         }
 
 #if (DBG_PCMONITOR == 1)
