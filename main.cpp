@@ -99,6 +99,22 @@ static void save_image_bmp(void) {
     sprintf(file_name, "/"MOUNT_NAME"/img_%d.bmp", file_name_index);
     cv::imwrite(file_name, img_gray);
     printf("Saved file %s\r\n", file_name);
+
+
+    FILE * fp = fopen("/storage/result.xyz", "a");
+    int px,py;
+    for (unsigned int y=0;y<VIDEO_PIXEL_VW;y++) {
+        for (unsigned int x=0;x<VIDEO_PIXEL_HW;x++) {
+
+            int intensity = img_gray.at<unsigned char>(y, x);
+            if (intensity > 0) {
+                px = x - 314;
+                py = y - 234;
+                fprintf(fp,"%d -%d %d\n", px, py, 0);
+            }
+        }
+    }
+    fclose(fp);
 }
 
 static void save_image_jpg(void) {
@@ -201,6 +217,12 @@ int setup() {
 
     cout << "camera matrix: " << intrinsic << endl
          << "distortion coeffs: " << distortion << endl;
+
+
+    FILE * fp = fopen("/storage/result.xyz", "w");
+    fprintf(fp,"-320 -240 0\n");
+    fprintf(fp,"320 240 0\n");
+    fclose(fp);
 
     return 0;
 }
