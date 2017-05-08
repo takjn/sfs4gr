@@ -176,7 +176,72 @@ int setup() {
     // cout << "camera matrix: " << intrinsic << endl
     //      << "distortion coeffs: " << distortion << endl;
     intrinsic = (cv::Mat_<double>(3,3) << 367.879585, 0.000000, 314.035869, 0.000000, 367.582735, 234.664545, 0.000000, 0.000000, 1.000000);
-    distortion = (cv::Mat_<double>(1,4) << -0.333848, 0.165991, 0.000608, -0.001805 );
+    distortion = (cv::Mat_<double>(1,5) << -0.333848, 0.165991, 0.000608, -0.001805, 0);
+
+
+// cv::Mat rvec = (cv::Mat_<double>(3, 1) << 0.0, 0.0, 0.0 );
+// cv::Mat tvec = (cv::Mat_<double>(3, 1) << 0.0, 0.0, 0.0 );
+cv::Mat xyz = (cv::Mat_<double>(4, 1) << 3.0, 4.0, 5.0, 1.0 );
+vector<cv::Point2f> pt;
+// cv::projectPoints(xyz, rvec, tvec, intrinsic, distortion, pt);
+
+
+// X = A.cross(B)
+
+// 0.990820  0.115340  0.070516  27.593584
+// 0.118059  -0.992365  -0.035681  21.710029
+// 0.065862  0.043679  -0.996872  49.612615
+// 0.000000  0.000000  0.000000  1.000000
+
+
+cv::Mat vec, cc;
+
+xyz = (cv::Mat_<double>(4, 1) << 0.0, 0.0, 0.0, 1.0 );
+vec = (cv::Mat_<double>(3, 4) << 0.01114, 0.0, 0.0, 80.0,   0.0, -0.01114, 0.0, 60.0,   0.0, 0.0, -0.01114, 50.0);
+cc = intrinsic*vec*xyz;
+std::cout << "2d points 1" << cc << std::endl;
+
+// xyz = (cv::Mat_<double>(4, 1) << 0.0, 0.0, 0.0, 1.0 );
+// vec = (cv::Mat_<double>(3, 4) << 0.01114, 0.0, 0.0, 80.0,   0.0, 0.01115, 0.0, 60.0,   0.0, 0.0, 0.01114, -50.0);
+// cc = intrinsic*vec*xyz;
+// std::cout << "2d points 1" << cc << std::endl;
+
+// xyz = (cv::Mat_<double>(4, 1) << 10.0, 0.0, 0.0, 1.0 );
+// vec = (cv::Mat_<double>(3, 4) << 0.01114, 0.0, 0.0, 80.0,   0.0, 0.01115, 0.0, 60.0,   0.0, 0.0, 0.01114, -50.0);
+// cc = intrinsic*vec*xyz;
+// std::cout << "2d points 2" << cc << std::endl;
+
+// xyz = (cv::Mat_<double>(4, 1) << 20.0, 0.0, 0.0, 1.0 );
+// vec = (cv::Mat_<double>(3, 4) << 0.01114, 0.0, 0.0, 80.0,   0.0, 0.01115, 0.0, 60.0,   0.0, 0.0, 0.01114, -50.0);
+// cc = intrinsic*vec*xyz;
+// std::cout << "2d points 3" << cc << std::endl;
+
+// xyz = (cv::Mat_<double>(4, 1) << 0.0, 10.0, 0.0, 1.0 );
+// vec = (cv::Mat_<double>(3, 4) << 0.01114, 0.0, 0.0, 80.0,   0.0, 0.01115, 0.0, 60.0,   0.0, 0.0, 0.01114, -50.0);
+// cc = intrinsic*vec*xyz;
+// std::cout << "2d points 4" << cc << std::endl;
+
+// xyz = (cv::Mat_<double>(4, 1) << 0.0, 20.0, 0.0, 1.0 );
+// vec = (cv::Mat_<double>(3, 4) << 0.01114, 0.0, 0.0, 80.0,   0.0, 0.01115, 0.0, 60.0,   0.0, 0.0, 0.01114, -50.0);
+// cc = intrinsic*vec*xyz;
+// std::cout << "2d points 5" << cc << std::endl;
+
+
+// cv::Mat aa = vec*xyz;
+// cv::Mat bb = intrinsic*aa;
+// cv::Mat cc = intrinsic*vec*xyz;
+
+// std::cout << "3d points " << xyz << std::endl;
+// std::cout << "3d points " << aa << std::endl;
+// std::cout << "2d points " << bb << std::endl;
+// std::cout << "2d points " << cc << std::endl;
+
+// cv::Mat aa = vec*xyz;
+// // cv::Mat bb = intrinsic*aa;
+// std::cout << "3d points " << xyz << std::endl;
+// std::cout << "vec " << vec << std::endl;
+// std::cout << "2d points " << aa << std::endl;
+// // std::cout << "2d points " << bb << std::endl;
 
     return 0;
 }
