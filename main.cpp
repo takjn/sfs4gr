@@ -55,9 +55,13 @@ DigitalOut  led2(LED2);
 DigitalOut  led3(LED3);
 DigitalOut  led4(LED4);
 
-static cv::Mat intrinsic, distortion;
-static cv::Mat img_background;
+static cv::Mat intrinsic, distortion;   // カメラ内部パラメータ
+static cv::Mat img_silhouette;  // 輪郭画像
+static cv::Mat img_background;  // 背景画像
 static bool has_background = false;
+
+#define PCD_POINTS 50
+static unsigned char point_cloud_data[PCD_POINTS][PCD_POINTS][PCD_POINTS]; // 点群データ
 
 static void set_background(void) {
     // Transform buffer into OpenCV Mat
@@ -71,6 +75,52 @@ static void set_background(void) {
     led3 = 1;
 }
 
+void roll_xyz(double rr,double Xt,double Yt,double Zt,
+	     double &Xw,double &Yw,double &Zw)
+{
+  Xw= cos(rr)*Xt - sin(rr)*Yt;
+  Yw= sin(rr)*Xt + cos(rr)*Yt;
+  Zw=Zt;
+
+  return;
+}
+
+void pitch_xyz(double pp,double Xt,double Yt,double Zt,
+	     double &Xw,double &Yw,double &Zw)
+{
+   Xw= cos(pp)*Xt + sin(pp)*Zt;
+   Yw= Yt;
+   Zw=-sin(pp)*Xt + cos(pp)*Zt;
+
+  return;
+}
+
+void yaw_xyz(double yy,double Xt,double Yt,double Zt,
+	     double &Xw,double &Yw,double &Zw)
+{
+  Xw= Xt;  
+  Yw= cos(yy)*Yt - sin(yy)*Zt;
+  Zw= sin(yy)*Yt + cos(yy)*Zt;
+  
+  return;
+}
+
+int projection(double rad, double Xw, double Yw,double Zw, int &u, int &v)
+{
+  // ワールド座標からカメラ座標への変換
+  double Xc, Yc, Zc;
+  Xw-=0;
+  Yw-=0;
+  Zw-=110;  // TODO:カメラ位置
+  pitch_xyz(rad, Xw, Yw, Zw, Xc, Yc, Zc);
+
+  // 画像座標へ変換
+  u= 314 - (int)((Xc/Zc)*(367.879585)); // TODO:カメラ内部パラメータ
+  v= 234 - (int)((Yc/Zc)*(367.582735));  // TODO:カメラ内部パラメータ
+
+  return (u<0 || u>640 || v<0 || v>480);
+}
+
 static void save_image_bmp(void) {
     if (!has_background) {
         return;
@@ -80,41 +130,61 @@ static void save_image_bmp(void) {
     cv::Mat img_yuv(VIDEO_PIXEL_VW, VIDEO_PIXEL_HW, CV_8UC2, user_frame_buffer0);
 
     // Convert from YUV422 to grayscale
-    cv::Mat img_gray;
-    cv::cvtColor(img_yuv, img_gray, CV_YUV2GRAY_YUY2);
+    cv::cvtColor(img_yuv, img_silhouette, CV_YUV2GRAY_YUY2);
 
     // Remove background
-    cv::Mat diff, dst;
-    cv::absdiff(img_gray, img_background, diff);
-    // cv::threshold(diff, img_gray, 5, 255, cv::THRESH_BINARY);
-    cv::threshold(diff, img_gray, 0, 255, cv::THRESH_BINARY | cv::THRESH_OTSU);
-
-    // // Filter dot noise
-    // cv::medianBlur(img_gray, img_gray, 5);
+    cv::Mat diff;
+    cv::absdiff(img_silhouette, img_background, diff);
+    cv::threshold(diff, img_silhouette, 0, 255, cv::THRESH_BINARY | cv::THRESH_OTSU);
 
     // Undistort
-    // cv::undistort(img_gray, dst, intrinsic, distortion);
+    // cv::undistort(img_silhouette, dst, intrinsic, distortion);
 
     char file_name[32];
     sprintf(file_name, "/"MOUNT_NAME"/img_%d.bmp", file_name_index);
-    cv::imwrite(file_name, img_gray);
+    cv::imwrite(file_name, img_silhouette);
     printf("Saved file %s\r\n", file_name);
 
+    int u,v, xx,yy,zz;
+    for (int z=0; z<PCD_POINTS; z++) {
+        for (int y=0; y<PCD_POINTS; y++) {
+            for (int x=0; x<PCD_POINTS; x++) {
+                if (point_cloud_data[x][y][z] == 1) {
+                    // 原点の移動（-50〜50の範囲を復元）
+                    xx = (x - PCD_POINTS / 2) * 4;
+                    yy = (y - PCD_POINTS / 2) * 4;
+                    zz = (z - PCD_POINTS / 2) * 4;
 
-    FILE * fp = fopen("/storage/result.xyz", "a");
-    int px,py;
-    for (unsigned int y=0;y<VIDEO_PIXEL_VW;y++) {
-        for (unsigned int x=0;x<VIDEO_PIXEL_HW;x++) {
-
-            int intensity = img_gray.at<unsigned char>(y, x);
-            if (intensity > 0) {
-                px = x - 314;
-                py = y - 234;
-                fprintf(fp,"%d -%d %d\n", px, py, 0);
+                    if (!projection(0, xx, yy, zz, u, v)) {
+                        // カメラ画像内のため、輪郭画像と比較
+                        if (!img_silhouette.at<unsigned char>(v, u)) {
+                            // 背景（黒色）のため、除外
+                            point_cloud_data[x][y][z] = 0;
+                        }
+                    } else {
+                        point_cloud_data[x][y][z] = 0;
+                    }
+                }
             }
         }
     }
-    fclose(fp);
+
+
+    // FILE * fp = fopen("/storage/result.xyz", "a");
+    // for (int z=-100; z<100; z+=2) {
+    //     for (int y=-100; y<100; y+=2) {
+    //         for (int x=-100; x<100; x+=2) {
+    //             if (!projection(0, x, y, z, u, v)) {
+    //                 // カメラ画像内のため、輪郭画像と比較
+    //                 int intensity = img_silhouette.at<unsigned char>(v, u);
+    //                 if (intensity > 0) {
+    //                     fprintf(fp,"%d %d %d\n", x, y, z);
+    //                 }
+    //             }
+    //         }
+    //     }
+    // }
+    // fclose(fp);
 }
 
 static void save_image_jpg(void) {
@@ -218,10 +288,17 @@ int setup() {
     cout << "camera matrix: " << intrinsic << endl
          << "distortion coeffs: " << distortion << endl;
 
+    // 点群データの初期化
+    for (int z=0;z<PCD_POINTS;z++) {
+        for (int y=0;y<PCD_POINTS;y++) {
+            for (int x=0;x<PCD_POINTS;x++) {
+                point_cloud_data[x][y][z]=1;
+            }
+        }
+    }
 
+    // 出力ファイルのクリア
     FILE * fp = fopen("/storage/result.xyz", "w");
-    fprintf(fp,"-320 -240 0\n");
-    fprintf(fp,"320 240 0\n");
     fclose(fp);
 
     return 0;
@@ -283,6 +360,20 @@ int main() {
             save_image_jpg(); // save as jpeg
             led1 = 0;
             file_name_index++;
+
+            // 点群データの出力
+            FILE * fp = fopen("/storage/result.xyz", "a");
+            for (int z=0;z<PCD_POINTS;z++) {
+                for (int y=0;y<PCD_POINTS;y++) {
+                    for (int x=0;x<PCD_POINTS;x++) {
+                        if (point_cloud_data[x][y][z]) {
+                            fprintf(fp,"%d %d %d\n", x, y, z);
+                        }
+                    }
+                }
+            }
+            fclose(fp);
+
 
             // for (int i=0;i<80;i++) {
             //     led1 = 1;
