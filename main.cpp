@@ -107,13 +107,15 @@ void yaw_xyz(double yy,double Xt,double Yt,double Zt,
 
 int projection(double rad, double Xw, double Yw,double Zw, int &u, int &v)
 {
-  // ワールド座標からカメラ座標への変換
-  double Xc, Yc, Zc;
-  Xw-=0;
-  Yw-=0;
-  Zw-=110;  // TODO:カメラ位置
-  pitch_xyz(rad, Xw, Yw, Zw, Xc, Yc, Zc);
+    // 原点を中心に回転
+    double Xc, Yc, Zc;
+    pitch_xyz(rad, Xw, Yw, Zw, Xc, Yc, Zc);
 
+    // ワールド座標からカメラ座標への変換
+    Xc-=0;
+    Yc-=0;
+    Zc-=110;  // TODO:カメラ位置
+  
   // 画像座標へ変換
   u= 314 - (int)((Xc/Zc)*(367.879585)); // TODO:カメラ内部パラメータ
   v= 234 - (int)((Yc/Zc)*(367.582735));  // TODO:カメラ内部パラメータ
@@ -185,6 +187,51 @@ static void save_image_bmp(void) {
     //     }
     // }
     // fclose(fp);
+}
+
+static void reconst(double rad) {
+    // Transform buffer into OpenCV Mat
+    cv::Mat img_yuv(VIDEO_PIXEL_VW, VIDEO_PIXEL_HW, CV_8UC2, user_frame_buffer0);
+
+    // Convert from YUV422 to grayscale
+    cv::cvtColor(img_yuv, img_silhouette, CV_YUV2GRAY_YUY2);
+
+    // Remove background
+    cv::Mat diff;
+    cv::absdiff(img_silhouette, img_background, diff);
+    cv::threshold(diff, img_silhouette, 0, 255, cv::THRESH_BINARY | cv::THRESH_OTSU);
+
+    // Undistort
+    // cv::undistort(img_silhouette, dst, intrinsic, distortion);
+
+    // char file_name[32];
+    // sprintf(file_name, "/"MOUNT_NAME"/img_%d.bmp", file_name_index);
+    // cv::imwrite(file_name, img_silhouette);
+    // printf("Saved file %s\r\n", file_name);
+
+    int u,v, xx,yy,zz;
+    for (int z=0; z<PCD_POINTS; z++) {
+        for (int y=0; y<PCD_POINTS; y++) {
+            for (int x=0; x<PCD_POINTS; x++) {
+                if (point_cloud_data[x][y][z] == 1) {
+                    // 原点の移動（-50〜50の範囲を復元）
+                    xx = (x - PCD_POINTS / 2) * 2;
+                    yy = (y - PCD_POINTS / 2) * 2 + 50; // TODO:デバッグ用オフセット
+                    zz = (z - PCD_POINTS / 2) * 2;
+
+                    if (!projection(rad, xx, yy, zz, u, v)) {
+                        // カメラ画像内のため、輪郭画像と比較
+                        if (!img_silhouette.at<unsigned char>(v, u)) {
+                            // 背景（黒色）のため、除外
+                            point_cloud_data[x][y][z] = 0;
+                        }
+                    } else {
+                        point_cloud_data[x][y][z] = 0;
+                    }
+                }
+            }
+        }
+    }
 }
 
 static void save_image_jpg(void) {
@@ -354,12 +401,17 @@ int main() {
             set_background(); // get background image
             led1 = 0;
         }
-        if (button1 == 0) {
-            led1 = 1;
-            save_image_bmp(); // save as bitmap
-            save_image_jpg(); // save as jpeg
-            led1 = 0;
-            file_name_index++;
+        if (button1 == 0 && has_background) {
+            for (int i=0;i<40;i++) {
+                led1 = 1;
+                double rad = (double)(2*3.14)*((double)i/40.0);
+                cout << "rad:" << rad << endl;
+                reconst(rad);
+                save_image_jpg(); // save as jpeg
+                led1 = 0;
+                file_name_index++;
+                rotate(20); // TODO:Step数（８００で一周）
+            }
 
             // 点群データの出力
             FILE * fp = fopen("/storage/result.xyz", "a");
@@ -373,16 +425,6 @@ int main() {
                 }
             }
             fclose(fp);
-
-
-            // for (int i=0;i<80;i++) {
-            //     led1 = 1;
-            //     save_image_bmp(); // save as bitmap
-            //     save_image_jpg(); // save as jpeg
-            //     led1 = 0;
-            //     rotate(10);
-            //     file_name_index++;
-            // }
         }
 
 #if (DBG_PCMONITOR == 1)
