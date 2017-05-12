@@ -6,6 +6,29 @@
 #include "opencv2/opencv.hpp"
 #include "DisplayApp.h"
 
+// ステッピングモーター関連のパラメーター
+#define STEPPER_WAIT    0.004   // wait
+#define STEPPER_STEPS   800     // 1周に必要なステップ数（Quarter step）
+#define STEPPER_STEP    20      // 1回のステップ数
+
+// カメラ関連のパラメーター（カメラのキャリブレーションが必要）
+#define CAMERA_CENTER_U 314     // 画像中心(横方向)
+#define CAMERA_CENTER_V 234     // 画像中心（縦方向）
+#define CAMERA_FX 367.879585    // カメラ焦点距離(fx)
+#define CAMERA_FY 367.879585    // カメラ焦点距離(fy)
+#define CAMERA_DISTANCE 110     // 原点からカメラの距離(mm)
+
+// 復元関連のパラメーター
+#define NOISE_THRESHOLD 3       // 欠損ノイズとみなすしきい値
+#define PCD_POINTS 80           // 復元する範囲(mm)
+
+// 復元関連のデータ
+static unsigned char point_cloud_data[PCD_POINTS][PCD_POINTS][PCD_POINTS]; // 仮想物体（復元する点群）
+static cv::Mat img_silhouette;      // 輪郭画像
+static cv::Mat img_background;      // 背景画像
+static bool has_background = false; // 背景画像を取得済かどうかを管理するフラグ
+static int reconst_count = 1;       // 復元結果ファイルのインデックス
+
 #define MOUNT_NAME             "storage"
 
 #define DBG_PCMONITOR (0)
@@ -60,17 +83,6 @@ DigitalOut A4988STEP(D8);
 DigitalOut A4988DIR(D9);
 
 static cv::Mat intrinsic, distortion;   // カメラ内部パラメータ
-static cv::Mat img_silhouette;  // 輪郭画像
-static cv::Mat img_background;  // 背景画像
-static bool has_background = false;
-
-
-#define STEPPER_WAIT    0.004   // wait
-#define STEPPER_STEPS   800     // 1周に必要なステップ数（Quarter step）
-#define STEPPER_STEP    20      // 1回のステップ数
-
-#define PCD_POINTS 80
-static unsigned char point_cloud_data[PCD_POINTS][PCD_POINTS][PCD_POINTS]; // 点群データ
 
 static void set_background(void) {
     // Transform buffer into OpenCV Mat
@@ -84,23 +96,22 @@ static void set_background(void) {
     led3 = 1;
 }
 
+// 3次元座標から2次元座標への変換
 int projection(double rad, double Xw, double Yw,double Zw, int &u, int &v)
 {
-    // 原点を中心にY軸周りに回転
+    // （仮想物体を）ワールド座標の原点を中心にY軸周りに回転
     double Xc= cos(rad)*Xw + sin(rad)*Zw;
     double Yc= Yw;
     double Zc=-sin(rad)*Xw + cos(rad)*Zw;
 
-    // ワールド座標からカメラ座標への変換
-    Xc-=0;
-    Yc-=0;
-    Zc-=110;  // TODO:カメラ位置
+    // ワールド座標からカメラ座標への変換（Z軸方向の移動のみ）
+    Zc-=CAMERA_DISTANCE;
   
   // 画像座標へ変換
-  u= 314 - (int)((Xc/Zc)*(367.879585)); // TODO:カメラ内部パラメータ
-  v= 234 - (int)((Yc/Zc)*(367.582735));  // TODO:カメラ内部パラメータ
+  u= CAMERA_CENTER_U - (int)((Xc/Zc)*(CAMERA_FX));
+  v= CAMERA_CENTER_V - (int)((Yc/Zc)*(CAMERA_FY));
 
-  return (u<0 || u>640 || v<0 || v>480);
+  return (u<0 || u>VIDEO_PIXEL_HW || v<0 || v>VIDEO_PIXEL_VW);
 }
 
 static void reconst(double rad) {
@@ -127,7 +138,7 @@ static void reconst(double rad) {
     for (int z=0; z<PCD_POINTS; z++) {
         for (int y=0; y<PCD_POINTS; y++) {
             for (int x=0; x<PCD_POINTS; x++) {
-                if (point_cloud_data[x][y][z] == 1) {
+                if (point_cloud_data[x][y][z] > 0) {
                     // 原点の移動（-40〜40の範囲を1mm単位で復元）
                     xx = (x - PCD_POINTS / 2);
                     yy = (y - PCD_POINTS / 2) + 50; // TODO:デバッグ用オフセット
@@ -137,10 +148,11 @@ static void reconst(double rad) {
                         // カメラ画像内のため、輪郭画像と比較
                         if (!img_silhouette.at<unsigned char>(v, u)) {
                             // 背景（黒色）のため、除外
-                            point_cloud_data[x][y][z] = 0;
+                            point_cloud_data[x][y][z]--;
                         }
                     } else {
-                        point_cloud_data[x][y][z] = 0;
+                        // カメラ画像外のためクリアする
+                        point_cloud_data[x][y][z]=0;
                     }
                 }
             }
@@ -222,6 +234,17 @@ uint8_t* get_jpeg_adr(){
     return JpegBuffer;
 }
 
+// 点群データの初期化
+void clear_point_cound_data() {
+    for (int z=0;z<PCD_POINTS;z++) {
+        for (int y=0;y<PCD_POINTS;y++) {
+            for (int x=0;x<PCD_POINTS;x++) {
+                point_cloud_data[x][y][z]=NOISE_THRESHOLD;
+            }
+        }
+    }
+}
+
 int setup() {
     A4988DIR = 0;
     A4988STEP = 0;
@@ -243,13 +266,7 @@ int setup() {
          << "distortion coeffs: " << distortion << endl;
 
     // 点群データの初期化
-    for (int z=0;z<PCD_POINTS;z++) {
-        for (int y=0;y<PCD_POINTS;y++) {
-            for (int x=0;x<PCD_POINTS;x++) {
-                point_cloud_data[x][y][z]=1;
-            }
-        }
-    }
+    clear_point_cound_data();
 
     return 0;
 }
@@ -313,12 +330,16 @@ int main() {
 
             // 点群データの出力
             cout << "writting..." << endl;
-            FILE * fp = fopen("/storage/result.xyz", "w");
+            
+            char file_name[32];
+            sprintf(file_name, "/"MOUNT_NAME"/result_%d.xyz", reconst_count++);
+            FILE * fp = fopen(file_name, "w");
             for (int z=1; z<PCD_POINTS-1; z++) {
                 for (int y=1; y<PCD_POINTS-1; y++) {
                     for (int x=1; x<PCD_POINTS-1; x++) {
                         if (point_cloud_data[x][y][z]) {
 
+                            // 物体内部の点は出力しない
                             int count = 0;
                             if (point_cloud_data[x-1][y-1][z-1]==0) count++;
                             if (point_cloud_data[x-1][y  ][z-1]==0) count++;
@@ -350,15 +371,14 @@ int main() {
                             if (point_cloud_data[x+1][y  ][z+1]==0) count++;
                             if (point_cloud_data[x+1][y+1][z+1]==0) count++;
 
-
-                            if (count>1)
-                                fprintf(fp,"%d -%d %d\n", x, y, z);
+                            if (count>1) fprintf(fp,"%d -%d %d\n", x, y, z);
                         }
                     }
                 }
             }
             fclose(fp);
             cout << "finish" << endl;
+            clear_point_cound_data();
         }
 
 #if (DBG_PCMONITOR == 1)
