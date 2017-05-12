@@ -351,7 +351,7 @@ int main() {
                             if (point_cloud_data[x+1][y+1][z+1]==0) count++;
 
 
-                            if (count>8)
+                            if (count>1)
                                 fprintf(fp,"%d -%d %d\n", x, y, z);
                         }
                     }
