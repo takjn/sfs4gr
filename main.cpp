@@ -82,8 +82,6 @@ DigitalOut  led4(LED4);
 DigitalOut A4988STEP(D8);
 DigitalOut A4988DIR(D9);
 
-static cv::Mat intrinsic, distortion;   // カメラ内部パラメータ
-
 static void set_background(void) {
     // Transform buffer into OpenCV Mat
     cv::Mat img_yuv(VIDEO_PIXEL_VW, VIDEO_PIXEL_HW, CV_8UC2, user_frame_buffer0);
@@ -126,7 +124,10 @@ static void reconst(double rad) {
     cv::absdiff(img_silhouette, img_background, diff);
     cv::threshold(diff, img_silhouette, 0, 255, cv::THRESH_BINARY | cv::THRESH_OTSU);
 
-    // Undistort
+    // Undistort (could not undistort because of out of memory on GR-LYCHEE)
+    // cv::Mat intrinsic, distortion;
+    // intrinsic = (cv::Mat_<double>(3,3) << 367.879585, 0.000000, 314.035869, 0.000000, 367.582735, 234.664545, 0.000000, 0.000000, 1.000000);
+    // distortion = (cv::Mat_<double>(1,4) << -0.333848, 0.165991, 0.000608, -0.001805);
     // cv::undistort(img_silhouette, dst, intrinsic, distortion);
 
     // char file_name[32];
@@ -141,7 +142,7 @@ static void reconst(double rad) {
                 if (point_cloud_data[x][y][z] > 0) {
                     // 原点の移動（-40〜40の範囲を1mm単位で復元）
                     xx = (x - PCD_POINTS / 2);
-                    yy = (y - PCD_POINTS / 2) + 50; // TODO:デバッグ用オフセット
+                    yy = (y - PCD_POINTS / 2) + 13; // TODO:デバッグ用オフセット
                     zz = (z - PCD_POINTS / 2);
 
                     if (!projection(rad, xx, yy, zz, u, v)) {
@@ -235,7 +236,7 @@ uint8_t* get_jpeg_adr(){
 }
 
 // 点群データの初期化
-void clear_point_cound_data() {
+void clear_point_cloud_data() {
     for (int z=0;z<PCD_POINTS;z++) {
         for (int y=0;y<PCD_POINTS;y++) {
             for (int x=0;x<PCD_POINTS;x++) {
@@ -243,32 +244,6 @@ void clear_point_cound_data() {
             }
         }
     }
-}
-
-int setup() {
-    A4988DIR = 0;
-    A4988STEP = 0;
-
-    // cv::FileStorage fs("/storage/camera.xml", cv::FileStorage::READ);
-    // if (!fs.isOpened()){
-    //     cout << "camera.xml open error" << endl;
-    //     return -1;
-    // }
-
-    // fs["intrinsic"] >> intrinsic;
-    // fs["distortion"] >> distortion;
-    // fs.release();
-
-    intrinsic = (cv::Mat_<double>(3,3) << 367.879585, 0.000000, 314.035869, 0.000000, 367.582735, 234.664545, 0.000000, 0.000000, 1.000000);
-    distortion = (cv::Mat_<double>(1,4) << -0.333848, 0.165991, 0.000608, -0.001805);
-
-    cout << "camera matrix: " << intrinsic << endl
-         << "distortion coeffs: " << distortion << endl;
-
-    // 点群データの初期化
-    clear_point_cound_data();
-
-    return 0;
 }
 
 void rotate(int steps) {
@@ -297,8 +272,13 @@ int main() {
 
     // SD & USB
     SdUsbConnect storage(MOUNT_NAME);
-    storage.wait_connect();
-    setup();
+
+    // Stepping motor
+    A4988DIR = 0;
+    A4988STEP = 0;
+
+    // Point cloud data
+    clear_point_cloud_data();
 
     button_shutter.mode(PullUp);
 
@@ -319,8 +299,7 @@ int main() {
         if (button1 == 0 && has_background) {
             for (int i=0;i<(STEPPER_STEPS/STEPPER_STEP);i++) {
                 led1 = 1;
-                double rad = (double)(2*3.14)*((double)i/40.0);
-                cout << "rad:" << rad << endl;
+                double rad = (double)(2*3.14)*((double)i/(STEPPER_STEPS/STEPPER_STEP));
                 reconst(rad);
                 save_image_jpg(); // save as jpeg
                 led1 = 0;
@@ -378,7 +357,7 @@ int main() {
             }
             fclose(fp);
             cout << "finish" << endl;
-            clear_point_cound_data();
+            clear_point_cloud_data();
         }
 
 #if (DBG_PCMONITOR == 1)
