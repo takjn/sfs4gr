@@ -20,7 +20,7 @@
 
 // 復元関連のパラメーター
 #define NOISE_THRESHOLD 3       // 欠損ノイズとみなすしきい値
-#define PCD_POINTS 80           // 復元する範囲(mm)
+#define PCD_POINTS 100          // 復元する範囲(mm)
 
 // 復元関連のデータ
 static unsigned char point_cloud_data[PCD_POINTS][PCD_POINTS][PCD_POINTS]; // 仮想物体（復元する点群）
@@ -120,9 +120,8 @@ static void reconst(double rad) {
     cv::cvtColor(img_yuv, img_silhouette, CV_YUV2GRAY_YUY2);
 
     // Remove background
-    cv::Mat diff;
-    cv::absdiff(img_silhouette, img_background, diff);
-    cv::threshold(diff, img_silhouette, 0, 255, cv::THRESH_BINARY | cv::THRESH_OTSU);
+    cv::absdiff(img_silhouette, img_background, img_silhouette);
+    cv::threshold(img_silhouette, img_silhouette, 0, 255, cv::THRESH_BINARY | cv::THRESH_OTSU);
 
     // Undistort (could not undistort because of out of memory on GR-LYCHEE)
     // cv::Mat intrinsic, distortion;
@@ -142,7 +141,7 @@ static void reconst(double rad) {
                 if (point_cloud_data[x][y][z] > 0) {
                     // 原点の移動（-40〜40の範囲を1mm単位で復元）
                     xx = (x - PCD_POINTS / 2);
-                    yy = (y - PCD_POINTS / 2) + 13; // TODO:デバッグ用オフセット
+                    yy = (y - PCD_POINTS / 2);
                     zz = (z - PCD_POINTS / 2);
 
                     if (!projection(rad, xx, yy, zz, u, v)) {
@@ -309,7 +308,7 @@ int main() {
 
             // 点群データの出力
             cout << "writting..." << endl;
-            
+            led1 = 1;
             char file_name[32];
             sprintf(file_name, "/"MOUNT_NAME"/result_%d.xyz", reconst_count++);
             FILE * fp = fopen(file_name, "w");
@@ -356,6 +355,7 @@ int main() {
                 }
             }
             fclose(fp);
+            led1 = 0;
             cout << "finish" << endl;
             clear_point_cloud_data();
         }
