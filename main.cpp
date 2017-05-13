@@ -8,6 +8,7 @@
 
 // 筐体に依存するパラメーター
 #define CAMERA_DISTANCE 110     // 原点(ステッピングモーター回転軸)からカメラの距離(mm)
+#define CAMERA_OFFSET -3        // カメラ高さの調整(mm)
 
 // ステッピングモーターの出力ピン(ステッピングモータードライバとしてA4988を利用)
 DigitalOut a4988_step(D8);
@@ -25,7 +26,8 @@ DigitalOut a4988_dir(D9);
 #define CAMERA_FY 367.879585    // カメラ焦点距離(fy)
 
 // 復元関連のパラメーター
-#define SILHOUETTE_NOISE_THRESHOLD 3    // 欠損ノイズとみなすしきい値
+#define SILHOUETTE_THRESH_BINARY 25     // 二値化する際のしきい値
+#define SILHOUETTE_NOISE_THRESHOLD 2    // 欠損ノイズとみなすしきい値
 #define PCD_POINTS 100                  // 復元する空間範囲(mm)
 
 // 復元関連のデータ
@@ -71,9 +73,9 @@ static int file_name_index = 1;
 static JPEG_Converter Jcu;
 #if defined(__ICCARM__)
 #pragma data_alignment=32
-static uint8_t JpegBuffer[1024 * 63];
+static uint8_t JpegBuffer[1024 * 31];
 #else
-static uint8_t JpegBuffer[1024 * 63]__attribute((aligned(32)));
+static uint8_t JpegBuffer[1024 * 31]__attribute((aligned(32)));
 #endif
 
 DisplayBase Display;
@@ -106,6 +108,7 @@ int projection(double rad, double Xw, double Yw,double Zw, int &u, int &v)
     double Zc=-sin(rad)*Xw + cos(rad)*Zw;
 
     // ワールド座標からカメラ座標への変換（Z軸方向の移動のみ）
+    Yc-=CAMERA_OFFSET;
     Zc-=CAMERA_DISTANCE;
   
     // 画像座標へ変換
@@ -126,9 +129,8 @@ void reconst(double rad) {
 
     // 背景画像の除去と輪郭画像の取得
     // Remove background and get silhouette
-    cv::Mat temp;
     cv::absdiff(img_silhouette, img_background, img_silhouette);
-    cv::threshold(img_silhouette, img_silhouette, 0, 255, cv::THRESH_BINARY | cv::THRESH_OTSU);
+    cv::threshold(img_silhouette, img_silhouette, SILHOUETTE_THRESH_BINARY, 255, cv::THRESH_BINARY);
 
     // レンズ歪みの除去 （GR-LYCHEEのメモリ不足により実行不可）
     // Undistort (could not undistort because of out of memory on GR-LYCHEE)
