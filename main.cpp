@@ -14,6 +14,17 @@
 DigitalOut a4988_step(D8);
 DigitalOut a4988_dir(D9);
 
+// ボタンの入力ピン
+DigitalIn   button0(D4);
+DigitalIn   button1(D6);
+
+// 状態表示LEDの出力ピン
+DigitalOut  led_working(D7);    // 処理中
+DigitalOut  led_ready(D5);      // 背景画像取得完了
+
+// デバッグ用（カメラが準備完了になった時にLED4を点灯）
+DigitalOut  led4(LED4);
+
 // ステッピングモーター関連のパラメーター
 #define STEPPER_WAIT    0.004   // wait
 #define STEPPER_STEPS   800     // 1周に必要なステップ数（Quarter step）
@@ -79,12 +90,6 @@ static uint8_t JpegBuffer[1024 * 31]__attribute((aligned(32)));
 #endif
 
 DisplayBase Display;
-DigitalIn   button0(USER_BUTTON0);
-DigitalIn   button1(USER_BUTTON1);
-DigitalOut  led1(LED1);
-DigitalOut  led2(LED2);
-DigitalOut  led3(LED3);
-DigitalOut  led4(LED4);
 
 // 背景画像の取得
 void get_background_image(void) {
@@ -96,7 +101,7 @@ void get_background_image(void) {
 
     // set flag
     has_background = true;
-    led3 = 1;
+    led_ready = 1;
 }
 
 // 3次元座標から2次元座標への変換
@@ -194,10 +199,8 @@ void clear_point_cloud_data() {
 void rotate(int steps) {
     a4988_dir = 1;
     for (int i=0;i<steps;i++) {
-        led2=1;
         a4988_step = 1;
         wait(STEPPER_WAIT);
-        led2=0;
         a4988_step = 0;
         wait(STEPPER_WAIT);
     }
@@ -303,20 +306,20 @@ int main() {
 
         if (button0 == 0) {
             // 背景画像の取得
-            led1 = 1;
+            led_working = 1;
             get_background_image(); // get background image
-            led1 = 0;
+            led_working = 0;
         }
         if (button1 == 0 && has_background) {
             // Shape from silhouette アルゴリズムによる立体形状復元
             // テーブルを回転させながら輪郭画像の取得と立体形状復元を繰り返す
             for (int i=0;i<(STEPPER_STEPS/STEPPER_STEP);i++) {
                 // 輪郭画像の取得と立体形状復元を繰り返す
-                led1 = 1;
+                led_working = 1;
                 double rad = (double)(2*3.14)*((double)i/(STEPPER_STEPS/STEPPER_STEP));
                 reconst(rad);
                 save_image_jpg(); // save as jpeg
-                led1 = 0;
+                led_working = 0;
                 file_name_index++;
 
                 // テーブルの回転
@@ -325,7 +328,7 @@ int main() {
 
             // 復元した立体形状データ(Point Cloud Data)の出力
             cout << "writting..." << endl;
-            led1 = 1;
+            led_working = 1;
             sprintf(file_name, "/"MOUNT_NAME"/result_%d.xyz", reconst_count++);
             FILE * fp = fopen(file_name, "w");
             for (int z=1; z<PCD_POINTS-1; z++) {
@@ -335,35 +338,13 @@ int main() {
 
                             // 物体内部の点は出力しない
                             int count = 0;
-                            if (point_cloud_data[x-1][y-1][z-1]==0) count++;
-                            if (point_cloud_data[x-1][y  ][z-1]==0) count++;
-                            if (point_cloud_data[x-1][y+1][z-1]==0) count++;
-                            if (point_cloud_data[x  ][y-1][z-1]==0) count++;
-                            if (point_cloud_data[x  ][y  ][z-1]==0) count++;
-                            if (point_cloud_data[x+1][y+1][z-1]==0) count++;
-                            if (point_cloud_data[x+1][y-1][z-1]==0) count++;
-                            if (point_cloud_data[x+1][y  ][z-1]==0) count++;
-                            if (point_cloud_data[x+1][y+1][z-1]==0) count++;
-
-                            if (point_cloud_data[x-1][y-1][z  ]==0) count++;
-                            if (point_cloud_data[x-1][y  ][z  ]==0) count++;
-                            if (point_cloud_data[x-1][y+1][z  ]==0) count++;
-                            if (point_cloud_data[x  ][y-1][z  ]==0) count++;
-                            // if (point_cloud_data[x  ][y  ][z  ]==0) count++;
-                            if (point_cloud_data[x+1][y+1][z  ]==0) count++;
-                            if (point_cloud_data[x+1][y-1][z  ]==0) count++;
-                            if (point_cloud_data[x+1][y  ][z  ]==0) count++;
-                            if (point_cloud_data[x+1][y+1][z  ]==0) count++;
-
-                            if (point_cloud_data[x-1][y-1][z+1]==0) count++;
-                            if (point_cloud_data[x-1][y  ][z+1]==0) count++;
-                            if (point_cloud_data[x-1][y+1][z+1]==0) count++;
-                            if (point_cloud_data[x  ][y-1][z+1]==0) count++;
-                            if (point_cloud_data[x  ][y  ][z+1]==0) count++;
-                            if (point_cloud_data[x+1][y+1][z+1]==0) count++;
-                            if (point_cloud_data[x+1][y-1][z+1]==0) count++;
-                            if (point_cloud_data[x+1][y  ][z+1]==0) count++;
-                            if (point_cloud_data[x+1][y+1][z+1]==0) count++;
+                            for (int i=-1;i<2;i++) {
+                                for (int j=-1;j<2;j++) {
+                                    for (int k=-1;k<2;k++) {
+                                        if (point_cloud_data[x+i][y+j][z+k]==0) count++;
+                                    }
+                                }
+                            }
 
                             if (count>1) fprintf(fp,"%d -%d %d\n", x, y, z);
                         }
@@ -371,7 +352,7 @@ int main() {
                 }
             }
             fclose(fp);
-            led1 = 0;
+            led_working = 0;
             cout << "finish" << endl;
             clear_point_cloud_data();
         }
