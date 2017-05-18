@@ -23,7 +23,7 @@ DigitalOut  led_working(D7);    // 処理中
 DigitalOut  led_ready(D5);      // 背景画像取得完了
 
 // デバッグ用（カメラが準備完了になった時にLED4を点灯）
-DigitalOut  led4(LED4);
+DigitalOut  led1(LED1);
 
 // ステッピングモーター関連のパラメーター
 #define STEPPER_WAIT    0.004   // wait
@@ -289,7 +289,7 @@ int main() {
     // Camera
     EasyAttach_Init(Display);
     Start_Video_Camera();
-    led4 = 1;
+    led1 = 1;
 
     // SD & USB
     SdUsbConnect storage(MOUNT_NAME);
