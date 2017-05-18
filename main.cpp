@@ -314,7 +314,7 @@ int main() {
             // Shape from silhouette アルゴリズムによる立体形状復元
             // テーブルを回転させながら輪郭画像の取得と立体形状復元を繰り返す
             for (int i=0;i<(STEPPER_STEPS/STEPPER_STEP);i++) {
-                // 輪郭画像の取得と立体形状復元を繰り返す
+                // 輪郭画像の取得と立体形状復元
                 led_working = 1;
                 double rad = (double)(2*3.14)*((double)i/(STEPPER_STEPS/STEPPER_STEP));
                 reconst(rad);
