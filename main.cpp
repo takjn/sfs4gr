@@ -22,7 +22,7 @@ DigitalIn   button1(D6);
 DigitalOut  led_working(D7);    // 処理中
 DigitalOut  led_ready(D5);      // 背景画像取得完了
 
-// デバッグ用（カメラが準備完了になった時にLED4を点灯）
+// デバッグ用（カメラが準備完了になった時にLED1を点灯）
 DigitalOut  led1(LED1);
 
 // ステッピングモーター関連のパラメーター
@@ -31,14 +31,14 @@ DigitalOut  led1(LED1);
 #define STEPPER_STEP    20      // 1回のステップ数
 
 // カメラ内部パラメーター（OpenCVのカメラキャリブレーションが必要）
-#define CAMERA_CENTER_U 314     // 画像中心(横方向)
-#define CAMERA_CENTER_V 234     // 画像中心（縦方向）
-#define CAMERA_FX 367.879585    // カメラ焦点距離(fx)
-#define CAMERA_FY 367.879585    // カメラ焦点距離(fy)
+#define CAMERA_CENTER_U 321     // 画像中心(横方向)
+#define CAMERA_CENTER_V 244     // 画像中心（縦方向）
+#define CAMERA_FX 365.202395    // カメラ焦点距離(fx)
+#define CAMERA_FY 365.519979    // カメラ焦点距離(fy)
 
 // 復元関連のパラメーター
-#define SILHOUETTE_THRESH_BINARY 25     // 二値化する際のしきい値
-#define SILHOUETTE_NOISE_THRESHOLD 2    // 欠損ノイズとみなすしきい値
+#define SILHOUETTE_THRESH_BINARY 30     // 二値化する際のしきい値
+#define SILHOUETTE_NOISE_THRESHOLD 1    // 欠損ノイズとみなすしきい値
 #define PCD_POINTS 100                  // 復元する空間範囲(mm)
 
 // 復元関連のデータ
@@ -51,7 +51,7 @@ static char file_name[32];          // 出力ファイル名
 
 #define MOUNT_NAME             "storage"
 
-#define DBG_PCMONITOR (0)
+#define DBG_PCMONITOR (1)
 #if (DBG_PCMONITOR == 1)
 /* For viewing image on PC */
 static DisplayApp  display_app;
@@ -84,9 +84,9 @@ static int file_name_index = 1;
 static JPEG_Converter Jcu;
 #if defined(__ICCARM__)
 #pragma data_alignment=32
-static uint8_t JpegBuffer[1024 * 31];
+static uint8_t JpegBuffer[1024 * 63];
 #else
-static uint8_t JpegBuffer[1024 * 31]__attribute((aligned(32)));
+static uint8_t JpegBuffer[1024 * 63]__attribute((aligned(32)));
 #endif
 
 DisplayBase Display;
@@ -140,8 +140,8 @@ void reconst(double rad) {
     // レンズ歪みの除去 （GR-LYCHEEのメモリ不足により実行不可）
     // Undistort (could not undistort because of out of memory on GR-LYCHEE)
     // cv::Mat intrinsic, distortion;
-    // intrinsic = (cv::Mat_<double>(3,3) << 367.879585, 0.000000, 314.035869, 0.000000, 367.582735, 234.664545, 0.000000, 0.000000, 1.000000);
-    // distortion = (cv::Mat_<double>(1,4) << -0.333848, 0.165991, 0.000608, -0.001805);
+    // intrinsic = (cv::Mat_<double>(3,3) << 365.202395, 0.000000, 320.742930, 0.000000, 0.000000, 365.519979, 243.711014, 0.000000, 1.000000);
+    // distortion = (cv::Mat_<double>(1,4) << -0.313710, 0.120268, -0.000775, -0.000554);
     // cv::undistort(temp, img_silhouette, intrinsic, distortion);
 
     // 輪郭画像の出力（デバッグ用だが、region RAM overflowed with Heapが発生するためコメントアウト）
@@ -152,7 +152,7 @@ void reconst(double rad) {
     // 輪郭画像による仮想物体の型抜き - Shape from silhouette
     // このプログラムでは、仮想物体の形状を点群(point cloud data)で表現している。
     // point_cloud_data[x][y][z] = 0の場合、そこには物体がないことを意味する。
-    // point_cloud_data[x][y][z] > 0の場合、そこには物体がある（可能性がある）ことを意味する。数字が大きいほど、可能性が高い。
+    // point_cloud_data[x][y][z] > 0の場合、そこには物体がある（可能性がある）ことを意味する。
     // 型抜きとは、仮想物体の復元対象点ごとに、輪郭画像内外を判定し、輪郭画像外であれば除去、輪郭画像内であれば保持を繰り返すこと。
     // このプログラムでは、原点を中心にxyzそれぞれ-50mm〜50mmの範囲を1mm単位で復元する。
     int xx,yy,zz;   // 復元対象の点の座標値(x,y,z)
@@ -308,6 +308,8 @@ int main() {
             // 背景画像の取得
             led_working = 1;
             get_background_image(); // get background image
+            save_image_jpg(); // save as jpeg
+            file_name_index++;
             led_working = 0;
         }
         if (button1 == 0 && has_background) {
