@@ -38,7 +38,7 @@ DigitalOut  led1(LED1);
 
 // 復元関連のパラメーター
 #define SILHOUETTE_THRESH_BINARY 30     // 二値化する際のしきい値
-#define SILHOUETTE_NOISE_THRESHOLD 1    // 欠損ノイズとみなすしきい値
+#define SILHOUETTE_NOISE_THRESHOLD 2    // 欠損ノイズとみなすしきい値
 #define PCD_POINTS 100                  // 復元する空間範囲(mm)
 
 // 復元関連のデータ
