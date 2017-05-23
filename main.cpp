@@ -348,7 +348,7 @@ int main() {
                                 }
                             }
 
-                            if (count>1) fprintf(fp,"%d -%d %d\n", x, y, z);
+                            if (count>4) fprintf(fp,"%d -%d %d\n", x, y, z);
                         }
                     }
                 }
