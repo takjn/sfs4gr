@@ -26,6 +26,7 @@ DigitalOut  led_ready(D5);      // 背景画像取得完了
 DigitalOut  led1(LED1);
 
 // ステッピングモーター関連のパラメーター
+#define STEPPER_DIRECTION 1     // ステッピングモーターの回転方向(0 または 1)
 #define STEPPER_WAIT    0.004   // wait
 #define STEPPER_STEPS   800     // 1周に必要なステップ数（Quarter step）
 #define STEPPER_STEP    20      // 1回のステップ数
@@ -154,7 +155,7 @@ void reconst(double rad) {
     // point_cloud_data[x][y][z] = 0の場合、そこには物体がないことを意味する。
     // point_cloud_data[x][y][z] > 0の場合、そこには物体がある（可能性がある）ことを意味する。
     // 型抜きとは、仮想物体の復元対象点ごとに、輪郭画像内外を判定し、輪郭画像外であれば除去、輪郭画像内であれば保持を繰り返すこと。
-    // このプログラムでは、原点を中心にxyzそれぞれ-50mm〜50mmの範囲を1mm単位で復元する。
+    // このプログラムでは、原点を中心にxyzそれぞれ-50mm ~ +50mmの範囲を1mm単位で復元する。
     int xx,yy,zz;   // 復元対象の点の座標値(x,y,z)
     int u,v;        // 復元対象の点の、カメラ画像内での座標値(x,y)
     for (int z=0; z<PCD_POINTS; z++) {
@@ -197,7 +198,7 @@ void clear_point_cloud_data() {
 
 // ステッピングモーターの回転(ステッピングモータードライバとしてA4988を利用)
 void rotate(int steps) {
-    a4988_dir = 1;
+    a4988_dir = STEPPER_DIRECTION;
     for (int i=0;i<steps;i++) {
         a4988_step = 1;
         wait(STEPPER_WAIT);
@@ -311,11 +312,19 @@ int main() {
             save_image_jpg(); // save as jpeg
             file_name_index++;
             led_working = 0;
+
+            wait_ms(100);
         }
         if (button1 == 0 && has_background) {
             // Shape from silhouette アルゴリズムによる立体形状復元
             // テーブルを回転させながら輪郭画像の取得と立体形状復元を繰り返す
             for (int i=0;i<(STEPPER_STEPS/STEPPER_STEP);i++) {
+#if (DBG_PCMONITOR == 1)
+                // プレビュー画像の送信
+                size_t jpeg_size = create_jpeg();
+                display_app.SendJpeg(get_jpeg_adr(), jpeg_size);
+#endif
+
                 // 輪郭画像の取得と立体形状復元
                 led_working = 1;
                 double rad = (double)(2*3.14)*((double)i/(STEPPER_STEPS/STEPPER_STEP));

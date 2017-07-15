@@ -1,5 +1,6 @@
 {
     "files.associations": {
-        "ostream": "cpp"
+        "ostream": "cpp",
+        "mbed_wait_api_no_rtos.c": "cpp"
     }
 }
