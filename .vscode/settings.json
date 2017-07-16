@@ -1,6 +1,9 @@
 {
     "files.associations": {
         "ostream": "cpp",
-        "mbed_wait_api_no_rtos.c": "cpp"
+        "mbed_wait_api_no_rtos.c": "cpp",
+        "lwip_demand.c": "cpp",
+        "rt_cmsis.c": "cpp",
+        "attributes.c": "cpp"
     }
 }
