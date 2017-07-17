@@ -7,8 +7,8 @@
 #include "DisplayApp.h"
 
 // 筐体に依存するパラメーター
-#define CAMERA_DISTANCE 110     // 原点(ステッピングモーター回転軸)からカメラの距離(mm)
-#define CAMERA_OFFSET -3        // カメラ高さの調整(mm)
+#define CAMERA_DISTANCE 115     // 原点(ステッピングモーター回転軸)からカメラの距離(mm)
+#define CAMERA_OFFSET  5        // カメラ高さの調整(mm)
 
 // ステッピングモーターの出力ピン(ステッピングモータードライバとしてA4988を利用)
 DigitalOut a4988_step(D8);
@@ -32,8 +32,8 @@ DigitalOut  led1(LED1);
 #define STEPPER_STEP    20      // 1回のステップ数
 
 // カメラ内部パラメーター（OpenCVのカメラキャリブレーションが必要）
-#define CAMERA_CENTER_U 321     // 画像中心(横方向)
-#define CAMERA_CENTER_V 244     // 画像中心（縦方向）
+#define CAMERA_CENTER_U 320     // 画像中心(横方向)
+#define CAMERA_CENTER_V 240     // 画像中心（縦方向）
 #define CAMERA_FX 365.202395    // カメラ焦点距離(fx)
 #define CAMERA_FY 365.519979    // カメラ焦点距離(fy)
 
@@ -114,7 +114,7 @@ int projection(double rad, double Xw, double Yw,double Zw, int &u, int &v)
     double Zc=-sin(rad)*Xw + cos(rad)*Zw;
 
     // ワールド座標からカメラ座標への変換（Z軸方向の移動のみ）
-    Yc-=CAMERA_OFFSET;
+    Yc+=CAMERA_OFFSET;
     Zc-=CAMERA_DISTANCE;
   
     // 画像座標へ変換
@@ -335,6 +335,19 @@ int main() {
 
                 // テーブルの回転
                 rotate(STEPPER_STEP);
+            }
+
+            // 復元した立体形状データの修正
+            for (int i=0; i<PCD_POINTS; i++) {
+                for (int j=0; j<PCD_POINTS; j++) {
+                    // 外周部は除去
+                    point_cloud_data[i][j][0] = 0;
+                    point_cloud_data[i][0][j] = 0;
+                    point_cloud_data[0][i][j] = 0;
+                    point_cloud_data[i][j][PCD_POINTS-1] = 0;
+                    point_cloud_data[i][PCD_POINTS-1][j] = 0;
+                    point_cloud_data[PCD_POINTS-1][i][j] = 0;
+                }
             }
 
             // 復元した立体形状データの出力
