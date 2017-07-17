@@ -4,6 +4,20 @@
         "mbed_wait_api_no_rtos.c": "cpp",
         "lwip_demand.c": "cpp",
         "rt_cmsis.c": "cpp",
-        "attributes.c": "cpp"
+        "attributes.c": "cpp",
+        "lwip_slipif.c": "cpp",
+        "slipif.c": "cpp",
+        "hal_ca9.c": "cpp",
+        "equeue.c": "cpp",
+        "tests.c": "cpp",
+        "nvm_ram.c": "cpp",
+        "event.c": "cpp",
+        "stm32f4_eth_init.c": "cpp",
+        "lwip_stack.c": "cpp",
+        "uvisor_semaphore.c": "cpp",
+        "coap_connection_handler.c": "cpp",
+        "can_api.c": "cpp",
+        "buffer_pool_allocator.c": "cpp",
+        "array": "cpp"
     }
 }

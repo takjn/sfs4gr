@@ -1,3 +1,4 @@
+#include <bitset>
 #include "mbed.h"
 #include "EasyAttach_CameraAndLCD.h"
 #include "SdUsbConnect.h"
@@ -39,11 +40,12 @@ DigitalOut  led1(LED1);
 
 // 復元関連のパラメーター
 #define SILHOUETTE_THRESH_BINARY 30     // 二値化する際のしきい値
-#define SILHOUETTE_NOISE_THRESHOLD 2    // 欠損ノイズとみなすしきい値
 #define PCD_POINTS 100                  // 復元する空間範囲(mm)
 
 // 復元関連のデータ
-static unsigned char point_cloud_data[PCD_POINTS][PCD_POINTS][PCD_POINTS]; // 仮想物体（復元する点群）
+bitset<PCD_POINTS*PCD_POINTS*PCD_POINTS> pcd;   // 仮想物体（復元する点群）
+#define point_cloud_data(x,y,z)  pcd[(x) + ((y)*PCD_POINTS) + (PCD_POINTS*PCD_POINTS*(z))]
+
 static cv::Mat img_silhouette;      // 輪郭画像
 static cv::Mat img_background;      // 背景画像
 static bool has_background = false; // 背景画像を取得済かどうかを管理するフラグ
@@ -145,15 +147,15 @@ void reconst(double rad) {
     // distortion = (cv::Mat_<double>(1,4) << -0.313710, 0.120268, -0.000775, -0.000554);
     // cv::undistort(temp, img_silhouette, intrinsic, distortion);
 
-    // 輪郭画像の出力（デバッグ用だが、region RAM overflowed with Heapが発生するためコメントアウト）
-    // sprintf(file_name, "/"MOUNT_NAME"/img_%d.bmp", file_name_index);
-    // cv::imwrite(file_name, img_silhouette);
-    // printf("Saved file %s\r\n", file_name);
+    // 輪郭画像の出力（デバッグ用）
+    sprintf(file_name, "/"MOUNT_NAME"/img_%d.bmp", file_name_index);
+    cv::imwrite(file_name, img_silhouette);
+    printf("Saved file %s\r\n", file_name);
 
     // 輪郭画像による仮想物体の型抜き - Shape from silhouette
     // このプログラムでは、仮想物体の形状を点群(point cloud data)で表現している。
-    // point_cloud_data[x][y][z] = 0の場合、そこには物体がないことを意味する。
-    // point_cloud_data[x][y][z] > 0の場合、そこには物体がある（可能性がある）ことを意味する。
+    // point_cloud_data(x,y,z) = 0の場合、そこには物体がないことを意味する。
+    // point_cloud_data(x,y,z) = 1の場合、そこには物体がある（可能性がある）ことを意味する。
     // 型抜きとは、仮想物体の復元対象点ごとに、輪郭画像内外を判定し、輪郭画像外であれば除去、輪郭画像内であれば保持を繰り返すこと。
     // このプログラムでは、原点を中心にxyzそれぞれ-50mm ~ +50mmの範囲を1mm単位で復元する。
     int xx,yy,zz;   // 復元対象の点の座標値(x,y,z)
@@ -161,7 +163,7 @@ void reconst(double rad) {
     for (int z=0; z<PCD_POINTS; z++) {
         for (int y=0; y<PCD_POINTS; y++) {
             for (int x=0; x<PCD_POINTS; x++) {
-                if (point_cloud_data[x][y][z] > 0) {
+                if (point_cloud_data(x,y,z) == 1) {
                     // 復元する点ごとに、輪郭画像内外を判定する
                     // 復元対象の点の座標値の計算
                     xx = (x - PCD_POINTS / 2);
@@ -173,11 +175,11 @@ void reconst(double rad) {
                         // カメラ画像内のため、輪郭画像と比較する
                         if (!img_silhouette.at<unsigned char>(v, u)) {
                             // 復元対象の点は、輪郭画像外（黒色）のため、除去
-                            point_cloud_data[x][y][z]--;
+                            point_cloud_data(x,y,z) = 0;
                         }
                     } else {
                         // カメラ画像外のためクリアする
-                        point_cloud_data[x][y][z]=0;
+                        point_cloud_data(x,y,z) = 0;
                     }
                 }
             }
@@ -190,7 +192,7 @@ void clear_point_cloud_data() {
     for (int z=0;z<PCD_POINTS;z++) {
         for (int y=0;y<PCD_POINTS;y++) {
             for (int x=0;x<PCD_POINTS;x++) {
-                point_cloud_data[x][y][z]=SILHOUETTE_NOISE_THRESHOLD;
+                point_cloud_data(x,y,z) = 1;
             }
         }
     }
@@ -341,12 +343,12 @@ int main() {
             for (int i=0; i<PCD_POINTS; i++) {
                 for (int j=0; j<PCD_POINTS; j++) {
                     // 外周部は除去
-                    point_cloud_data[i][j][0] = 0;
-                    point_cloud_data[i][0][j] = 0;
-                    point_cloud_data[0][i][j] = 0;
-                    point_cloud_data[i][j][PCD_POINTS-1] = 0;
-                    point_cloud_data[i][PCD_POINTS-1][j] = 0;
-                    point_cloud_data[PCD_POINTS-1][i][j] = 0;
+                    point_cloud_data(i,j,0) = 0;
+                    point_cloud_data(i,0,j) = 0;
+                    point_cloud_data(0,i,j) = 0;
+                    point_cloud_data(i,j,PCD_POINTS-1) = 0;
+                    point_cloud_data(i,PCD_POINTS-1,j) = 0;
+                    point_cloud_data(PCD_POINTS-1,i,j) = 0;
                 }
             }
 
@@ -361,10 +363,10 @@ int main() {
             for (int z=1; z<PCD_POINTS-1; z++) {
                 for (int y=1; y<PCD_POINTS-1; y++) {
                     for (int x=1; x<PCD_POINTS-1; x++) {
-                        if (point_cloud_data[x][y][z] > 0) {
+                        if (point_cloud_data(x,y,z) == 1) {
 
                             // STLファイルの出力
-                            if (point_cloud_data[x][y][z+1] == 0) {
+                            if (point_cloud_data(x,y,z+1) == 0) {
                                 fprintf(fp_stl,"facet normal 0 0 1\n");
                                 fprintf(fp_stl,"outer loop\n");
                                 fprintf(fp_stl,"vertex %d %d %d\n", x+0, y+0, z+1);
@@ -381,7 +383,7 @@ int main() {
                                 fprintf(fp_stl,"endfacet\n");
                             }
 
-                            if (point_cloud_data[x+1][y][z] == 0) {
+                            if (point_cloud_data(x+1,y,z) == 0) {
                                 fprintf(fp_stl,"facet normal 1 0 0\n");
                                 fprintf(fp_stl,"outer loop\n");
                                 fprintf(fp_stl,"vertex %d %d %d\n", x+1, y+0, z+1);
@@ -398,7 +400,7 @@ int main() {
                                 fprintf(fp_stl,"endfacet\n");
                             }
 
-                            if (point_cloud_data[x][y][z-1] == 0) {
+                            if (point_cloud_data(x,y,z-1) == 0) {
                                 fprintf(fp_stl,"facet normal 0 0 -1\n");
                                 fprintf(fp_stl,"outer loop\n");
                                 fprintf(fp_stl,"vertex %d %d %d\n", x+1, y+0, z+0);
@@ -415,7 +417,7 @@ int main() {
                                 fprintf(fp_stl,"endfacet\n");
                             }
 
-                            if (point_cloud_data[x-1][y][z] == 0) {
+                            if (point_cloud_data(x-1,y,z) == 0) {
                                 fprintf(fp_stl,"facet normal -1 0 0\n");
                                 fprintf(fp_stl,"outer loop\n");
                                 fprintf(fp_stl,"vertex %d %d %d\n", x+0, y+0, z+0);
@@ -432,7 +434,7 @@ int main() {
                                 fprintf(fp_stl,"endfacet\n");
                             }
 
-                            if (point_cloud_data[x][y+1][z] == 0) {
+                            if (point_cloud_data(x,y+1,z) == 0) {
                                 fprintf(fp_stl,"facet normal 0 1 0\n");
                                 fprintf(fp_stl,"outer loop\n");
                                 fprintf(fp_stl,"vertex %d %d %d\n", x+0, y+1, z+1);
@@ -449,7 +451,7 @@ int main() {
                                 fprintf(fp_stl,"endfacet\n");
                             }
 
-                            if (point_cloud_data[x][y-1][z] == 0) {
+                            if (point_cloud_data(x,y-1,z) == 0) {
                                 fprintf(fp_stl,"facet normal 0 -1 0\n");
                                 fprintf(fp_stl,"outer loop\n");
                                 fprintf(fp_stl,"vertex %d %d %d\n", x+1, y+0, z+1);
