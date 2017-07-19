@@ -18,6 +18,11 @@
         "coap_connection_handler.c": "cpp",
         "can_api.c": "cpp",
         "buffer_pool_allocator.c": "cpp",
-        "array": "cpp"
+        "array": "cpp",
+        "ns_nvm_helper.c": "cpp",
+        "functional": "cpp",
+        "istream": "cpp",
+        "tuple": "cpp",
+        "utility": "cpp"
     }
 }

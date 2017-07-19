@@ -133,19 +133,18 @@ void reconst(double rad) {
     cv::Mat img_yuv(VIDEO_PIXEL_VW, VIDEO_PIXEL_HW, CV_8UC2, user_frame_buffer0);
 
     // Convert from YUV422 to grayscale
-    cv::cvtColor(img_yuv, img_silhouette, CV_YUV2GRAY_YUY2);
+    cv::Mat img_silhouette_tmp;
+    cv::cvtColor(img_yuv, img_silhouette_tmp, CV_YUV2GRAY_YUY2);
 
     // 背景画像の除去と輪郭画像の取得
-    // Remove background and get silhouette
-    cv::absdiff(img_silhouette, img_background, img_silhouette);
-    cv::threshold(img_silhouette, img_silhouette, SILHOUETTE_THRESH_BINARY, 255, cv::THRESH_BINARY);
+    // Background subtraction and get silhouette
+    cv::absdiff(img_silhouette_tmp, img_background, img_silhouette_tmp);
+    cv::threshold(img_silhouette_tmp, img_silhouette_tmp, SILHOUETTE_THRESH_BINARY, 255, cv::THRESH_BINARY);
 
-    // レンズ歪みの除去 （GR-LYCHEEのメモリ不足により実行不可）
-    // Undistort (could not undistort because of out of memory on GR-LYCHEE)
-    // cv::Mat intrinsic, distortion;
-    // intrinsic = (cv::Mat_<double>(3,3) << 365.202395, 0.000000, 320.742930, 0.000000, 0.000000, 365.519979, 243.711014, 0.000000, 1.000000);
-    // distortion = (cv::Mat_<double>(1,4) << -0.313710, 0.120268, -0.000775, -0.000554);
-    // cv::undistort(temp, img_silhouette, intrinsic, distortion);
+    // レンズ歪みの除去
+    cv::Mat intrinsic = (cv::Mat_<double>(3,3) << 365.202395, 0.000000, 320.742930, 0.000000, 365.519979, 243.711014, 0.000000, 0.000000, 1.000000);
+    cv::Mat distortion = (cv::Mat_<double>(1,4) << -0.313710, 0.120268, -0.000775, -0.000554);
+    cv::undistort(img_silhouette_tmp, img_silhouette, intrinsic, distortion);
 
     // 輪郭画像の出力（デバッグ用）
     sprintf(file_name, "/"MOUNT_NAME"/img_%d.bmp", file_name_index);
