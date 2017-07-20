@@ -44,8 +44,8 @@ DigitalOut  led1(LED1);
 #define PCD_SCALE 0.5                   // 復元する間隔(mm)
 
 // 復元関連のデータ
-bitset<PCD_POINTS*PCD_POINTS*PCD_POINTS> pcd;   // 仮想物体（復元する点群）
-#define point_cloud_data(x,y,z)  pcd[(x) + ((y)*PCD_POINTS) + (PCD_POINTS*PCD_POINTS*(z))]
+bitset<PCD_POINTS*PCD_POINTS*PCD_POINTS> point_cloud_data;   // 仮想物体（復元する点群）
+#define point_cloud_data(x,y,z)  point_cloud_data[(x) + ((y)*PCD_POINTS) + (PCD_POINTS*PCD_POINTS*(z))]
 
 static cv::Mat img_silhouette;      // 輪郭画像
 static cv::Mat img_background;      // 背景画像
@@ -124,7 +124,7 @@ int projection(double rad, double Xw, double Yw,double Zw, int &u, int &v)
     u= CAMERA_CENTER_U - (int)((Xc/Zc)*(CAMERA_FX));
     v= CAMERA_CENTER_V - (int)((Yc/Zc)*(CAMERA_FY));
 
-    return (u<0 || u>VIDEO_PIXEL_HW || v<0 || v>VIDEO_PIXEL_VW);
+    return (u>0 && u<VIDEO_PIXEL_HW && v>0 && v>VIDEO_PIXEL_VW);
 }
 
 // 輪郭画像からの立体形状復元
@@ -152,28 +152,31 @@ void reconst(double rad) {
     // point_cloud_data(x,y,z) = 1の場合、そこには物体がある（可能性がある）ことを意味する。
     // 型抜きとは、仮想物体の復元対象点ごとに、輪郭画像内外を判定し、輪郭画像外であれば除去、輪郭画像内であれば保持を繰り返すこと。
     // このプログラムでは、原点を中心にxyzそれぞれ-50mm ~ +50mmの範囲を1mm単位で復元する。
-    double xx,yy,zz;   // 復元対象の点の座標値(x,y,z)
-    int u,v;        // 復元対象の点の、カメラ画像内での座標値(x,y)
+    double xx,yy,zz;    // 復元対象の点の座標値(x,y,z)
+    int u,v;            // 復元対象の点の、カメラ画像内での座標値(x,y)
+    int pcd_index=0;    // 仮想物体の復元対象点
     for (int z=0; z<PCD_POINTS; z++) {
+        // 復元対象の点の座標値の計算(z)
+        zz = (z - PCD_POINTS / 2) * PCD_SCALE;
         for (int y=0; y<PCD_POINTS; y++) {
-            for (int x=0; x<PCD_POINTS; x++) {
-                if (point_cloud_data(x,y,z) == 1) {
+            // 復元対象の点の座標値の計算(y)
+            yy = (y - PCD_POINTS / 2) * PCD_SCALE;
+            for (int x=0; x<PCD_POINTS; x++, pcd_index++) {
+                if (point_cloud_data[pcd_index] == 1) {
                     // 復元する点ごとに、輪郭画像内外を判定する
-                    // 復元対象の点の座標値の計算
+                    // 復元対象の点の座標値の計算(x)
                     xx = (x - PCD_POINTS / 2) * PCD_SCALE;
-                    yy = (y - PCD_POINTS / 2) * PCD_SCALE;
-                    zz = (z - PCD_POINTS / 2) * PCD_SCALE;
 
                     // 復元対象の点がカメラ画像内ではどこにあるかを計算する
-                    if (!projection(rad, xx, yy, zz, u, v)) {
+                    if (projection(rad, xx, yy, zz, u, v)) {
                         // カメラ画像内のため、輪郭画像と比較する
                         if (!img_silhouette.at<unsigned char>(v, u)) {
                             // 復元対象の点は、輪郭画像外（黒色）のため、除去
-                            point_cloud_data(x,y,z) = 0;
+                            point_cloud_data[pcd_index] = 0;
                         }
                     } else {
                         // カメラ画像外のためクリアする
-                        point_cloud_data(x,y,z) = 0;
+                        point_cloud_data[pcd_index] = 0;
                     }
                 }
             }
