@@ -9,7 +9,7 @@
 
 // 筐体に依存するパラメーター
 #define CAMERA_DISTANCE 115     // 原点(ステッピングモーター回転軸)からカメラの距離(mm)
-#define CAMERA_OFFSET  5        // カメラ高さの調整(mm)
+#define CAMERA_OFFSET  3        // カメラ高さの調整(mm)
 
 // ステッピングモーターの出力ピン(ステッピングモータードライバとしてA4988を利用)
 DigitalOut a4988_step(D8);
@@ -33,14 +33,15 @@ DigitalOut  led1(LED1);
 #define STEPPER_STEP    20      // 1回のステップ数
 
 // カメラ内部パラメーター（OpenCVのカメラキャリブレーションが必要）
-#define CAMERA_CENTER_U 320     // 画像中心(横方向)
-#define CAMERA_CENTER_V 240     // 画像中心（縦方向）
+#define CAMERA_CENTER_U 321     // 画像中心(横方向)
+#define CAMERA_CENTER_V 244     // 画像中心（縦方向）
 #define CAMERA_FX 365.202395    // カメラ焦点距離(fx)
 #define CAMERA_FY 365.519979    // カメラ焦点距離(fy)
 
 // 復元関連のパラメーター
 #define SILHOUETTE_THRESH_BINARY 30     // 二値化する際のしきい値
-#define PCD_POINTS 100                  // 復元する空間範囲(mm)
+#define PCD_POINTS 200                  // 復元する空間範囲(mm)
+#define PCD_SCALE 0.5                   // 復元する間隔(mm)
 
 // 復元関連のデータ
 bitset<PCD_POINTS*PCD_POINTS*PCD_POINTS> pcd;   // 仮想物体（復元する点群）
@@ -140,10 +141,10 @@ void reconst(double rad) {
     cv::absdiff(img_silhouette, img_background, img_silhouette);
     cv::threshold(img_silhouette, img_silhouette, SILHOUETTE_THRESH_BINARY, 255, cv::THRESH_BINARY);
 
-    // 輪郭画像の出力（デバッグ用）
-    sprintf(file_name, "/"MOUNT_NAME"/img_%d.bmp", file_name_index);
-    cv::imwrite(file_name, img_silhouette);
-    printf("Saved file %s\r\n", file_name);
+    // // 輪郭画像の出力（デバッグ用）
+    // sprintf(file_name, "/"MOUNT_NAME"/img_%d.bmp", file_name_index);
+    // cv::imwrite(file_name, img_silhouette);
+    // printf("Saved file %s\r\n", file_name);
 
     // 輪郭画像による仮想物体の型抜き - Shape from silhouette
     // このプログラムでは、仮想物体の形状を点群(point cloud data)で表現している。
@@ -151,7 +152,7 @@ void reconst(double rad) {
     // point_cloud_data(x,y,z) = 1の場合、そこには物体がある（可能性がある）ことを意味する。
     // 型抜きとは、仮想物体の復元対象点ごとに、輪郭画像内外を判定し、輪郭画像外であれば除去、輪郭画像内であれば保持を繰り返すこと。
     // このプログラムでは、原点を中心にxyzそれぞれ-50mm ~ +50mmの範囲を1mm単位で復元する。
-    int xx,yy,zz;   // 復元対象の点の座標値(x,y,z)
+    double xx,yy,zz;   // 復元対象の点の座標値(x,y,z)
     int u,v;        // 復元対象の点の、カメラ画像内での座標値(x,y)
     for (int z=0; z<PCD_POINTS; z++) {
         for (int y=0; y<PCD_POINTS; y++) {
@@ -159,9 +160,9 @@ void reconst(double rad) {
                 if (point_cloud_data(x,y,z) == 1) {
                     // 復元する点ごとに、輪郭画像内外を判定する
                     // 復元対象の点の座標値の計算
-                    xx = (x - PCD_POINTS / 2);
-                    yy = (y - PCD_POINTS / 2);
-                    zz = (z - PCD_POINTS / 2);
+                    xx = (x - PCD_POINTS / 2) * PCD_SCALE;
+                    yy = (y - PCD_POINTS / 2) * PCD_SCALE;
+                    zz = (z - PCD_POINTS / 2) * PCD_SCALE;
 
                     // 復元対象の点がカメラ画像内ではどこにあるかを計算する
                     if (!projection(rad, xx, yy, zz, u, v)) {
@@ -362,16 +363,16 @@ int main() {
                             if (point_cloud_data(x,y,z+1) == 0) {
                                 fprintf(fp_stl,"facet normal 0 0 1\n");
                                 fprintf(fp_stl,"outer loop\n");
-                                fprintf(fp_stl,"vertex %d %d %d\n", x+0, y+0, z+1);
-                                fprintf(fp_stl,"vertex %d %d %d\n", x+1, y+0, z+1);
-                                fprintf(fp_stl,"vertex %d %d %d\n", x+0, y+1, z+1);
+                                fprintf(fp_stl,"vertex %f %f %f\n", (x+0)*PCD_SCALE, (y+0)*PCD_SCALE, (z+1)*PCD_SCALE);
+                                fprintf(fp_stl,"vertex %f %f %f\n", (x+1)*PCD_SCALE, (y+0)*PCD_SCALE, (z+1)*PCD_SCALE);
+                                fprintf(fp_stl,"vertex %f %f %f\n", (x+0)*PCD_SCALE, (y+1)*PCD_SCALE, (z+1)*PCD_SCALE);
                                 fprintf(fp_stl,"endloop\n");
                                 fprintf(fp_stl,"endfacet\n");
                                 fprintf(fp_stl,"facet normal 0 0 1\n");
                                 fprintf(fp_stl,"outer loop\n");
-                                fprintf(fp_stl,"vertex %d %d %d\n", x+1, y+1, z+1);
-                                fprintf(fp_stl,"vertex %d %d %d\n", x+0, y+1, z+1);
-                                fprintf(fp_stl,"vertex %d %d %d\n", x+1, y+0, z+1);
+                                fprintf(fp_stl,"vertex %f %f %f\n", (x+1)*PCD_SCALE, (y+1)*PCD_SCALE, (z+1)*PCD_SCALE);
+                                fprintf(fp_stl,"vertex %f %f %f\n", (x+0)*PCD_SCALE, (y+1)*PCD_SCALE, (z+1)*PCD_SCALE);
+                                fprintf(fp_stl,"vertex %f %f %f\n", (x+1)*PCD_SCALE, (y+0)*PCD_SCALE, (z+1)*PCD_SCALE);
                                 fprintf(fp_stl,"endloop\n");
                                 fprintf(fp_stl,"endfacet\n");
                             }
@@ -379,16 +380,16 @@ int main() {
                             if (point_cloud_data(x+1,y,z) == 0) {
                                 fprintf(fp_stl,"facet normal 1 0 0\n");
                                 fprintf(fp_stl,"outer loop\n");
-                                fprintf(fp_stl,"vertex %d %d %d\n", x+1, y+0, z+1);
-                                fprintf(fp_stl,"vertex %d %d %d\n", x+1, y+0, z+0);
-                                fprintf(fp_stl,"vertex %d %d %d\n", x+1, y+1, z+1);
+                                fprintf(fp_stl,"vertex %f %f %f\n", (x+1)*PCD_SCALE, (y+0)*PCD_SCALE, (z+1)*PCD_SCALE);
+                                fprintf(fp_stl,"vertex %f %f %f\n", (x+1)*PCD_SCALE, (y+0)*PCD_SCALE, (z+0)*PCD_SCALE);
+                                fprintf(fp_stl,"vertex %f %f %f\n", (x+1)*PCD_SCALE, (y+1)*PCD_SCALE, (z+1)*PCD_SCALE);
                                 fprintf(fp_stl,"endloop\n");
                                 fprintf(fp_stl,"endfacet\n");
                                 fprintf(fp_stl,"facet normal 1 0 0\n");
                                 fprintf(fp_stl,"outer loop\n");
-                                fprintf(fp_stl,"vertex %d %d %d\n", x+1, y+1, z+0);
-                                fprintf(fp_stl,"vertex %d %d %d\n", x+1, y+1, z+1);
-                                fprintf(fp_stl,"vertex %d %d %d\n", x+1, y+0, z+0);
+                                fprintf(fp_stl,"vertex %f %f %f\n", (x+1)*PCD_SCALE, (y+1)*PCD_SCALE, (z+0)*PCD_SCALE);
+                                fprintf(fp_stl,"vertex %f %f %f\n", (x+1)*PCD_SCALE, (y+1)*PCD_SCALE, (z+1)*PCD_SCALE);
+                                fprintf(fp_stl,"vertex %f %f %f\n", (x+1)*PCD_SCALE, (y+0)*PCD_SCALE, (z+0)*PCD_SCALE);
                                 fprintf(fp_stl,"endloop\n");
                                 fprintf(fp_stl,"endfacet\n");
                             }
@@ -396,16 +397,16 @@ int main() {
                             if (point_cloud_data(x,y,z-1) == 0) {
                                 fprintf(fp_stl,"facet normal 0 0 -1\n");
                                 fprintf(fp_stl,"outer loop\n");
-                                fprintf(fp_stl,"vertex %d %d %d\n", x+1, y+0, z+0);
-                                fprintf(fp_stl,"vertex %d %d %d\n", x+0, y+0, z+0);
-                                fprintf(fp_stl,"vertex %d %d %d\n", x+1, y+1, z+0);
+                                fprintf(fp_stl,"vertex %f %f %f\n", (x+1)*PCD_SCALE, (y+0)*PCD_SCALE, (z+0)*PCD_SCALE);
+                                fprintf(fp_stl,"vertex %f %f %f\n", (x+0)*PCD_SCALE, (y+0)*PCD_SCALE, (z+0)*PCD_SCALE);
+                                fprintf(fp_stl,"vertex %f %f %f\n", (x+1)*PCD_SCALE, (y+1)*PCD_SCALE, (z+0)*PCD_SCALE);
                                 fprintf(fp_stl,"endloop\n");
                                 fprintf(fp_stl,"endfacet\n");
                                 fprintf(fp_stl,"facet normal 0 0 -1\n");
                                 fprintf(fp_stl,"outer loop\n");
-                                fprintf(fp_stl,"vertex %d %d %d\n", x+0, y+1, z+0);
-                                fprintf(fp_stl,"vertex %d %d %d\n", x+1, y+1, z+0);
-                                fprintf(fp_stl,"vertex %d %d %d\n", x+0, y+0, z+0);
+                                fprintf(fp_stl,"vertex %f %f %f\n", (x+0)*PCD_SCALE, (y+1)*PCD_SCALE, (z+0)*PCD_SCALE);
+                                fprintf(fp_stl,"vertex %f %f %f\n", (x+1)*PCD_SCALE, (y+1)*PCD_SCALE, (z+0)*PCD_SCALE);
+                                fprintf(fp_stl,"vertex %f %f %f\n", (x+0)*PCD_SCALE, (y+0)*PCD_SCALE, (z+0)*PCD_SCALE);
                                 fprintf(fp_stl,"endloop\n");
                                 fprintf(fp_stl,"endfacet\n");
                             }
@@ -413,16 +414,16 @@ int main() {
                             if (point_cloud_data(x-1,y,z) == 0) {
                                 fprintf(fp_stl,"facet normal -1 0 0\n");
                                 fprintf(fp_stl,"outer loop\n");
-                                fprintf(fp_stl,"vertex %d %d %d\n", x+0, y+0, z+0);
-                                fprintf(fp_stl,"vertex %d %d %d\n", x+0, y+0, z+1);
-                                fprintf(fp_stl,"vertex %d %d %d\n", x+0, y+1, z+0);
+                                fprintf(fp_stl,"vertex %f %f %f\n", (x+0)*PCD_SCALE, (y+0)*PCD_SCALE, (z+0)*PCD_SCALE);
+                                fprintf(fp_stl,"vertex %f %f %f\n", (x+0)*PCD_SCALE, (y+0)*PCD_SCALE, (z+1)*PCD_SCALE);
+                                fprintf(fp_stl,"vertex %f %f %f\n", (x+0)*PCD_SCALE, (y+1)*PCD_SCALE, (z+0)*PCD_SCALE);
                                 fprintf(fp_stl,"endloop\n");
                                 fprintf(fp_stl,"endfacet\n");
                                 fprintf(fp_stl,"facet normal -1 0 0\n");
                                 fprintf(fp_stl,"outer loop\n");
-                                fprintf(fp_stl,"vertex %d %d %d\n", x+0, y+1, z+1);
-                                fprintf(fp_stl,"vertex %d %d %d\n", x+0, y+1, z+0);
-                                fprintf(fp_stl,"vertex %d %d %d\n", x+0, y+0, z+1);
+                                fprintf(fp_stl,"vertex %f %f %f\n", (x+0)*PCD_SCALE, (y+1)*PCD_SCALE, (z+1)*PCD_SCALE);
+                                fprintf(fp_stl,"vertex %f %f %f\n", (x+0)*PCD_SCALE, (y+1)*PCD_SCALE, (z+0)*PCD_SCALE);
+                                fprintf(fp_stl,"vertex %f %f %f\n", (x+0)*PCD_SCALE, (y+0)*PCD_SCALE, (z+1)*PCD_SCALE);
                                 fprintf(fp_stl,"endloop\n");
                                 fprintf(fp_stl,"endfacet\n");
                             }
@@ -430,16 +431,16 @@ int main() {
                             if (point_cloud_data(x,y+1,z) == 0) {
                                 fprintf(fp_stl,"facet normal 0 1 0\n");
                                 fprintf(fp_stl,"outer loop\n");
-                                fprintf(fp_stl,"vertex %d %d %d\n", x+0, y+1, z+1);
-                                fprintf(fp_stl,"vertex %d %d %d\n", x+1, y+1, z+1);
-                                fprintf(fp_stl,"vertex %d %d %d\n", x+0, y+1, z+0);
+                                fprintf(fp_stl,"vertex %f %f %f\n", (x+0)*PCD_SCALE, (y+1)*PCD_SCALE, (z+1)*PCD_SCALE);
+                                fprintf(fp_stl,"vertex %f %f %f\n", (x+1)*PCD_SCALE, (y+1)*PCD_SCALE, (z+1)*PCD_SCALE);
+                                fprintf(fp_stl,"vertex %f %f %f\n", (x+0)*PCD_SCALE, (y+1)*PCD_SCALE, (z+0)*PCD_SCALE);
                                 fprintf(fp_stl,"endloop\n");
                                 fprintf(fp_stl,"endfacet\n");
                                 fprintf(fp_stl,"facet normal 0 1 0\n");
                                 fprintf(fp_stl,"outer loop\n");
-                                fprintf(fp_stl,"vertex %d %d %d\n", x+1, y+1, z+0);
-                                fprintf(fp_stl,"vertex %d %d %d\n", x+0, y+1, z+0);
-                                fprintf(fp_stl,"vertex %d %d %d\n", x+1, y+1, z+1);
+                                fprintf(fp_stl,"vertex %f %f %f\n", (x+1)*PCD_SCALE, (y+1)*PCD_SCALE, (z+0)*PCD_SCALE);
+                                fprintf(fp_stl,"vertex %f %f %f\n", (x+0)*PCD_SCALE, (y+1)*PCD_SCALE, (z+0)*PCD_SCALE);
+                                fprintf(fp_stl,"vertex %f %f %f\n", (x+1)*PCD_SCALE, (y+1)*PCD_SCALE, (z+1)*PCD_SCALE);
                                 fprintf(fp_stl,"endloop\n");
                                 fprintf(fp_stl,"endfacet\n");
                             }
@@ -447,16 +448,16 @@ int main() {
                             if (point_cloud_data(x,y-1,z) == 0) {
                                 fprintf(fp_stl,"facet normal 0 -1 0\n");
                                 fprintf(fp_stl,"outer loop\n");
-                                fprintf(fp_stl,"vertex %d %d %d\n", x+1, y+0, z+1);
-                                fprintf(fp_stl,"vertex %d %d %d\n", x+0, y+0, z+1);
-                                fprintf(fp_stl,"vertex %d %d %d\n", x+1, y+0, z+0);
+                                fprintf(fp_stl,"vertex %f %f %f\n", (x+1)*PCD_SCALE, (y+0)*PCD_SCALE, (z+1)*PCD_SCALE);
+                                fprintf(fp_stl,"vertex %f %f %f\n", (x+0)*PCD_SCALE, (y+0)*PCD_SCALE, (z+1)*PCD_SCALE);
+                                fprintf(fp_stl,"vertex %f %f %f\n", (x+1)*PCD_SCALE, (y+0)*PCD_SCALE, (z+0)*PCD_SCALE);
                                 fprintf(fp_stl,"endloop\n");
                                 fprintf(fp_stl,"endfacet\n");
                                 fprintf(fp_stl,"facet normal 0 -1 0\n");
                                 fprintf(fp_stl,"outer loop\n");
-                                fprintf(fp_stl,"vertex %d %d %d\n", x+0, y+0, z+0);
-                                fprintf(fp_stl,"vertex %d %d %d\n", x+1, y+0, z+0);
-                                fprintf(fp_stl,"vertex %d %d %d\n", x+0, y+0, z+1);
+                                fprintf(fp_stl,"vertex %f %f %f\n", (x+0)*PCD_SCALE, (y+0)*PCD_SCALE, (z+0)*PCD_SCALE);
+                                fprintf(fp_stl,"vertex %f %f %f\n", (x+1)*PCD_SCALE, (y+0)*PCD_SCALE, (z+0)*PCD_SCALE);
+                                fprintf(fp_stl,"vertex %f %f %f\n", (x+0)*PCD_SCALE, (y+0)*PCD_SCALE, (z+1)*PCD_SCALE);
                                 fprintf(fp_stl,"endloop\n");
                                 fprintf(fp_stl,"endfacet\n");
                             }
