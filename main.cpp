@@ -40,8 +40,8 @@ DigitalOut  led1(LED1);
 
 // 復元関連のパラメーター
 #define SILHOUETTE_THRESH_BINARY 30     // 二値化する際のしきい値
-#define PCD_POINTS 200                  // 復元する空間範囲(mm)
-#define PCD_SCALE 0.5                   // 復元する間隔(mm)
+#define PCD_POINTS 100                  // 復元する空間範囲(mm)
+#define PCD_SCALE 1.0                   // 復元する間隔(mm)
 
 // 復元関連のデータ
 bitset<PCD_POINTS*PCD_POINTS*PCD_POINTS> point_cloud_data;   // 仮想物体（復元する点群）
@@ -124,7 +124,7 @@ int projection(double rad, double Xw, double Yw,double Zw, int &u, int &v)
     u= CAMERA_CENTER_U - (int)((Xc/Zc)*(CAMERA_FX));
     v= CAMERA_CENTER_V - (int)((Yc/Zc)*(CAMERA_FY));
 
-    return (u>0 && u<VIDEO_PIXEL_HW && v>0 && v>VIDEO_PIXEL_VW);
+    return (u>0 && u<VIDEO_PIXEL_HW && v>0 && v<VIDEO_PIXEL_VW);
 }
 
 // 輪郭画像からの立体形状復元
@@ -155,22 +155,24 @@ void reconst(double rad) {
     double xx,yy,zz;    // 復元対象の点の座標値(x,y,z)
     int u,v;            // 復元対象の点の、カメラ画像内での座標値(x,y)
     int pcd_index=0;    // 仮想物体の復元対象点
-    for (int z=0; z<PCD_POINTS; z++) {
-        // 復元対象の点の座標値の計算(z)
-        zz = (z - PCD_POINTS / 2) * PCD_SCALE;
-        for (int y=0; y<PCD_POINTS; y++) {
-            // 復元対象の点の座標値の計算(y)
-            yy = (y - PCD_POINTS / 2) * PCD_SCALE;
-            for (int x=0; x<PCD_POINTS; x++, pcd_index++) {
-                if (point_cloud_data[pcd_index] == 1) {
-                    // 復元する点ごとに、輪郭画像内外を判定する
-                    // 復元対象の点の座標値の計算(x)
-                    xx = (x - PCD_POINTS / 2) * PCD_SCALE;
 
+    zz = (-PCD_POINTS / 2) * PCD_SCALE;
+    for (int z=0; z<PCD_POINTS; z++, zz += PCD_SCALE) {
+
+        yy = (-PCD_POINTS / 2) * PCD_SCALE;
+        for (int y=0; y<PCD_POINTS; y++, yy += PCD_SCALE) {
+
+            xx = (-PCD_POINTS / 2) * PCD_SCALE;
+            for (int x=0; x<PCD_POINTS; x++, xx += PCD_SCALE, pcd_index++) {
+                if (point_cloud_data[pcd_index] == 1) {
+                    
                     // 復元対象の点がカメラ画像内ではどこにあるかを計算する
                     if (projection(rad, xx, yy, zz, u, v)) {
                         // カメラ画像内のため、輪郭画像と比較する
-                        if (!img_silhouette.at<unsigned char>(v, u)) {
+                        if (img_silhouette.at<unsigned char>(v, u)) {
+                            // 復元対象の点は、輪郭画像内（白色）のため、そのまま
+                        }
+                        else {
                             // 復元対象の点は、輪郭画像外（黒色）のため、除去
                             point_cloud_data[pcd_index] = 0;
                         }
