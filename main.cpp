@@ -8,6 +8,7 @@
 #include "DisplayApp.h"
 
 void save_as_stl(const char*);
+void save_as_ply(const char*);
 
 // 筐体に依存するパラメーター
 #define CAMERA_DISTANCE 115     // 原点(ステッピングモーター回転軸)からカメラの距離(mm)
@@ -357,8 +358,11 @@ int main() {
             cout << "writting..." << endl;
             led_working = 1;
 
-            sprintf(file_name, "/"MOUNT_NAME"/result_%d.stl", reconst_count++);
+            sprintf(file_name, "/"MOUNT_NAME"/result_%d.stl", reconst_count);
             save_as_stl(file_name);
+            sprintf(file_name, "/"MOUNT_NAME"/result_%d.ply", reconst_count);
+            save_as_ply(file_name);
+            reconst_count++;
 
             led_working = 0;
             cout << "finish" << endl;
@@ -371,6 +375,101 @@ int main() {
 #endif
 
     }
+}
+
+void save_as_ply(const char* file_name) {
+    FILE *fp_ply = fopen(file_name, "w");
+
+    // 先に面の数を数えておく
+    int x,y,z;
+    int face_count=0;
+    for (z=1; z<PCD_POINTS-1; z++) {
+        for (y=1; y<PCD_POINTS-1; y++) {
+            for (x=1; x<PCD_POINTS-1; x++) {
+                if (point_cloud_data(x,y,z) == 1) {
+                    if (point_cloud_data(x,y,z+1) == 0) face_count++;
+                    if (point_cloud_data(x+1,y,z) == 0) face_count++;
+                    if (point_cloud_data(x,y,z-1) == 0) face_count++;
+                    if (point_cloud_data(x-1,y,z) == 0) face_count++;
+                    if (point_cloud_data(x,y+1,z) == 0) face_count++;
+                    if (point_cloud_data(x,y-1,z) == 0) face_count++;
+                }
+            }
+        }
+    }
+
+	// write PLY file header
+    fprintf(fp_ply,"ply\n");
+    fprintf(fp_ply,"format ascii 1.0\n");
+    fprintf(fp_ply,"element vertex %d\n", face_count*4);
+    fprintf(fp_ply,"property float x\n");
+    fprintf(fp_ply,"property float y\n");
+    fprintf(fp_ply,"property float z\n");
+    fprintf(fp_ply,"property uchar red\n");
+    fprintf(fp_ply,"property uchar green\n");
+    fprintf(fp_ply,"property uchar blue\n");
+    fprintf(fp_ply,"element face %d\n", face_count);
+    fprintf(fp_ply,"property list uint8 int32 vertex_indices\n");
+    fprintf(fp_ply,"end_header\n");
+
+    // Vertexの出力
+    for (z=1; z<PCD_POINTS-1; z++) {
+        for (y=1; y<PCD_POINTS-1; y++) {
+            for (x=1; x<PCD_POINTS-1; x++) {
+                if (point_cloud_data(x,y,z) == 1) {
+
+                    if (point_cloud_data(x,y,z-1) == 0) {
+                        fprintf(fp_ply,"%f %f %f 200 200 200\n", x    *PCD_SCALE, y    *PCD_SCALE, z    *PCD_SCALE);
+                        fprintf(fp_ply,"%f %f %f 200 200 200\n", x    *PCD_SCALE, (y+1)*PCD_SCALE, z    *PCD_SCALE);
+                        fprintf(fp_ply,"%f %f %f 200 200 200\n", (x+1)*PCD_SCALE, (y+1)*PCD_SCALE, z    *PCD_SCALE);
+                        fprintf(fp_ply,"%f %f %f 200 200 200\n", (x+1)*PCD_SCALE, y    *PCD_SCALE, z    *PCD_SCALE);
+                    }
+
+                    if (point_cloud_data(x,y,z+1) == 0) {
+                        fprintf(fp_ply,"%f %f %f 200 200 200\n", x    *PCD_SCALE, y    *PCD_SCALE, (z+1)*PCD_SCALE);
+                        fprintf(fp_ply,"%f %f %f 200 200 200\n", (x+1)*PCD_SCALE, y    *PCD_SCALE, (z+1)*PCD_SCALE);
+                        fprintf(fp_ply,"%f %f %f 200 200 200\n", (x+1)*PCD_SCALE, (y+1)*PCD_SCALE, (z+1)*PCD_SCALE);
+                        fprintf(fp_ply,"%f %f %f 200 200 200\n", x    *PCD_SCALE, (y+1)*PCD_SCALE, (z+1)*PCD_SCALE);
+                    }
+
+                    if (point_cloud_data(x-1,y,z) == 0) {
+                        fprintf(fp_ply,"%f %f %f 200 200 200\n", x    *PCD_SCALE, y    *PCD_SCALE, z    *PCD_SCALE);
+                        fprintf(fp_ply,"%f %f %f 200 200 200\n", x    *PCD_SCALE, y    *PCD_SCALE, (z+1)*PCD_SCALE);
+                        fprintf(fp_ply,"%f %f %f 200 200 200\n", x    *PCD_SCALE, (y+1)*PCD_SCALE, (z+1)*PCD_SCALE);
+                        fprintf(fp_ply,"%f %f %f 200 200 200\n", x    *PCD_SCALE, (y+1)*PCD_SCALE, z    *PCD_SCALE);
+                    }
+
+                    if (point_cloud_data(x+1,y,z) == 0) {
+                        fprintf(fp_ply,"%f %f %f 200 200 200\n", (x+1)*PCD_SCALE, y    *PCD_SCALE, z    *PCD_SCALE);
+                        fprintf(fp_ply,"%f %f %f 200 200 200\n", (x+1)*PCD_SCALE, (y+1)*PCD_SCALE, z    *PCD_SCALE);
+                        fprintf(fp_ply,"%f %f %f 200 200 200\n", (x+1)*PCD_SCALE, (y+1)*PCD_SCALE, (z+1)*PCD_SCALE);
+                        fprintf(fp_ply,"%f %f %f 200 200 200\n", (x+1)*PCD_SCALE, y    *PCD_SCALE, (z+1)*PCD_SCALE);
+                    }
+
+                    if (point_cloud_data(x,y-1,z) == 0) {
+                        fprintf(fp_ply,"%f %f %f 200 200 200\n", x    *PCD_SCALE, y    *PCD_SCALE, z    *PCD_SCALE);
+                        fprintf(fp_ply,"%f %f %f 200 200 200\n", (x+1)*PCD_SCALE, y    *PCD_SCALE, z    *PCD_SCALE);
+                        fprintf(fp_ply,"%f %f %f 200 200 200\n", (x+1)*PCD_SCALE, y    *PCD_SCALE, (z+1)*PCD_SCALE);
+                        fprintf(fp_ply,"%f %f %f 200 200 200\n", x    *PCD_SCALE, y    *PCD_SCALE, (z+1)*PCD_SCALE);
+                    }
+
+                    if (point_cloud_data(x,y+1,z) == 0) {
+                        fprintf(fp_ply,"%f %f %f 200 200 200\n", x    *PCD_SCALE, (y+1)*PCD_SCALE, z    *PCD_SCALE);
+                        fprintf(fp_ply,"%f %f %f 200 200 200\n", x    *PCD_SCALE, (y+1)*PCD_SCALE, (z+1)*PCD_SCALE);
+                        fprintf(fp_ply,"%f %f %f 200 200 200\n", (x+1)*PCD_SCALE, (y+1)*PCD_SCALE, (z+1)*PCD_SCALE);
+                        fprintf(fp_ply,"%f %f %f 200 200 200\n", (x+1)*PCD_SCALE, (y+1)*PCD_SCALE, z    *PCD_SCALE);
+                    }
+                }
+            }
+        }
+    }
+
+    for (int i=0;i<face_count;i++) {
+        int idx = i*4;
+        fprintf(fp_ply,"4 %d %d %d %d\n", idx, idx+1, idx+2, idx+3);
+    }
+
+	fclose(fp_ply);
 }
 
 void save_as_stl(const char* file_name) {
