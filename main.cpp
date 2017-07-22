@@ -7,6 +7,8 @@
 #include "opencv2/opencv.hpp"
 #include "DisplayApp.h"
 
+void save_as_stl(const char*);
+
 // 筐体に依存するパラメーター
 #define CAMERA_DISTANCE 115     // 原点(ステッピングモーター回転軸)からカメラの距離(mm)
 #define CAMERA_OFFSET  3        // カメラ高さの調整(mm)
@@ -141,7 +143,7 @@ void reconst(double rad) {
     cv::absdiff(img_silhouette, img_background, img_silhouette);
     cv::threshold(img_silhouette, img_silhouette, SILHOUETTE_THRESH_BINARY, 255, cv::THRESH_BINARY);
 
-    // // 輪郭画像の出力（デバッグ用）
+    // 輪郭画像の出力（デバッグ用）
     // sprintf(file_name, "/"MOUNT_NAME"/img_%d.bmp", file_name_index);
     // cv::imwrite(file_name, img_silhouette);
     // printf("Saved file %s\r\n", file_name);
@@ -354,125 +356,9 @@ int main() {
             // 復元した立体形状データの出力
             cout << "writting..." << endl;
             led_working = 1;
+
             sprintf(file_name, "/"MOUNT_NAME"/result_%d.stl", reconst_count++);
-            FILE *fp_stl = fopen(file_name, "w");
-            // write STL file header
-            fprintf(fp_stl,"solid result-ascii\n");
-            
-            for (int z=1; z<PCD_POINTS-1; z++) {
-                for (int y=1; y<PCD_POINTS-1; y++) {
-                    for (int x=1; x<PCD_POINTS-1; x++) {
-                        if (point_cloud_data(x,y,z) == 1) {
-
-                            // STLファイルの出力
-                            if (point_cloud_data(x,y,z+1) == 0) {
-                                fprintf(fp_stl,"facet normal 0 0 1\n");
-                                fprintf(fp_stl,"outer loop\n");
-                                fprintf(fp_stl,"vertex %f %f %f\n", (x+0)*PCD_SCALE, (y+0)*PCD_SCALE, (z+1)*PCD_SCALE);
-                                fprintf(fp_stl,"vertex %f %f %f\n", (x+1)*PCD_SCALE, (y+0)*PCD_SCALE, (z+1)*PCD_SCALE);
-                                fprintf(fp_stl,"vertex %f %f %f\n", (x+0)*PCD_SCALE, (y+1)*PCD_SCALE, (z+1)*PCD_SCALE);
-                                fprintf(fp_stl,"endloop\n");
-                                fprintf(fp_stl,"endfacet\n");
-                                fprintf(fp_stl,"facet normal 0 0 1\n");
-                                fprintf(fp_stl,"outer loop\n");
-                                fprintf(fp_stl,"vertex %f %f %f\n", (x+1)*PCD_SCALE, (y+1)*PCD_SCALE, (z+1)*PCD_SCALE);
-                                fprintf(fp_stl,"vertex %f %f %f\n", (x+0)*PCD_SCALE, (y+1)*PCD_SCALE, (z+1)*PCD_SCALE);
-                                fprintf(fp_stl,"vertex %f %f %f\n", (x+1)*PCD_SCALE, (y+0)*PCD_SCALE, (z+1)*PCD_SCALE);
-                                fprintf(fp_stl,"endloop\n");
-                                fprintf(fp_stl,"endfacet\n");
-                            }
-
-                            if (point_cloud_data(x+1,y,z) == 0) {
-                                fprintf(fp_stl,"facet normal 1 0 0\n");
-                                fprintf(fp_stl,"outer loop\n");
-                                fprintf(fp_stl,"vertex %f %f %f\n", (x+1)*PCD_SCALE, (y+0)*PCD_SCALE, (z+1)*PCD_SCALE);
-                                fprintf(fp_stl,"vertex %f %f %f\n", (x+1)*PCD_SCALE, (y+0)*PCD_SCALE, (z+0)*PCD_SCALE);
-                                fprintf(fp_stl,"vertex %f %f %f\n", (x+1)*PCD_SCALE, (y+1)*PCD_SCALE, (z+1)*PCD_SCALE);
-                                fprintf(fp_stl,"endloop\n");
-                                fprintf(fp_stl,"endfacet\n");
-                                fprintf(fp_stl,"facet normal 1 0 0\n");
-                                fprintf(fp_stl,"outer loop\n");
-                                fprintf(fp_stl,"vertex %f %f %f\n", (x+1)*PCD_SCALE, (y+1)*PCD_SCALE, (z+0)*PCD_SCALE);
-                                fprintf(fp_stl,"vertex %f %f %f\n", (x+1)*PCD_SCALE, (y+1)*PCD_SCALE, (z+1)*PCD_SCALE);
-                                fprintf(fp_stl,"vertex %f %f %f\n", (x+1)*PCD_SCALE, (y+0)*PCD_SCALE, (z+0)*PCD_SCALE);
-                                fprintf(fp_stl,"endloop\n");
-                                fprintf(fp_stl,"endfacet\n");
-                            }
-
-                            if (point_cloud_data(x,y,z-1) == 0) {
-                                fprintf(fp_stl,"facet normal 0 0 -1\n");
-                                fprintf(fp_stl,"outer loop\n");
-                                fprintf(fp_stl,"vertex %f %f %f\n", (x+1)*PCD_SCALE, (y+0)*PCD_SCALE, (z+0)*PCD_SCALE);
-                                fprintf(fp_stl,"vertex %f %f %f\n", (x+0)*PCD_SCALE, (y+0)*PCD_SCALE, (z+0)*PCD_SCALE);
-                                fprintf(fp_stl,"vertex %f %f %f\n", (x+1)*PCD_SCALE, (y+1)*PCD_SCALE, (z+0)*PCD_SCALE);
-                                fprintf(fp_stl,"endloop\n");
-                                fprintf(fp_stl,"endfacet\n");
-                                fprintf(fp_stl,"facet normal 0 0 -1\n");
-                                fprintf(fp_stl,"outer loop\n");
-                                fprintf(fp_stl,"vertex %f %f %f\n", (x+0)*PCD_SCALE, (y+1)*PCD_SCALE, (z+0)*PCD_SCALE);
-                                fprintf(fp_stl,"vertex %f %f %f\n", (x+1)*PCD_SCALE, (y+1)*PCD_SCALE, (z+0)*PCD_SCALE);
-                                fprintf(fp_stl,"vertex %f %f %f\n", (x+0)*PCD_SCALE, (y+0)*PCD_SCALE, (z+0)*PCD_SCALE);
-                                fprintf(fp_stl,"endloop\n");
-                                fprintf(fp_stl,"endfacet\n");
-                            }
-
-                            if (point_cloud_data(x-1,y,z) == 0) {
-                                fprintf(fp_stl,"facet normal -1 0 0\n");
-                                fprintf(fp_stl,"outer loop\n");
-                                fprintf(fp_stl,"vertex %f %f %f\n", (x+0)*PCD_SCALE, (y+0)*PCD_SCALE, (z+0)*PCD_SCALE);
-                                fprintf(fp_stl,"vertex %f %f %f\n", (x+0)*PCD_SCALE, (y+0)*PCD_SCALE, (z+1)*PCD_SCALE);
-                                fprintf(fp_stl,"vertex %f %f %f\n", (x+0)*PCD_SCALE, (y+1)*PCD_SCALE, (z+0)*PCD_SCALE);
-                                fprintf(fp_stl,"endloop\n");
-                                fprintf(fp_stl,"endfacet\n");
-                                fprintf(fp_stl,"facet normal -1 0 0\n");
-                                fprintf(fp_stl,"outer loop\n");
-                                fprintf(fp_stl,"vertex %f %f %f\n", (x+0)*PCD_SCALE, (y+1)*PCD_SCALE, (z+1)*PCD_SCALE);
-                                fprintf(fp_stl,"vertex %f %f %f\n", (x+0)*PCD_SCALE, (y+1)*PCD_SCALE, (z+0)*PCD_SCALE);
-                                fprintf(fp_stl,"vertex %f %f %f\n", (x+0)*PCD_SCALE, (y+0)*PCD_SCALE, (z+1)*PCD_SCALE);
-                                fprintf(fp_stl,"endloop\n");
-                                fprintf(fp_stl,"endfacet\n");
-                            }
-
-                            if (point_cloud_data(x,y+1,z) == 0) {
-                                fprintf(fp_stl,"facet normal 0 1 0\n");
-                                fprintf(fp_stl,"outer loop\n");
-                                fprintf(fp_stl,"vertex %f %f %f\n", (x+0)*PCD_SCALE, (y+1)*PCD_SCALE, (z+1)*PCD_SCALE);
-                                fprintf(fp_stl,"vertex %f %f %f\n", (x+1)*PCD_SCALE, (y+1)*PCD_SCALE, (z+1)*PCD_SCALE);
-                                fprintf(fp_stl,"vertex %f %f %f\n", (x+0)*PCD_SCALE, (y+1)*PCD_SCALE, (z+0)*PCD_SCALE);
-                                fprintf(fp_stl,"endloop\n");
-                                fprintf(fp_stl,"endfacet\n");
-                                fprintf(fp_stl,"facet normal 0 1 0\n");
-                                fprintf(fp_stl,"outer loop\n");
-                                fprintf(fp_stl,"vertex %f %f %f\n", (x+1)*PCD_SCALE, (y+1)*PCD_SCALE, (z+0)*PCD_SCALE);
-                                fprintf(fp_stl,"vertex %f %f %f\n", (x+0)*PCD_SCALE, (y+1)*PCD_SCALE, (z+0)*PCD_SCALE);
-                                fprintf(fp_stl,"vertex %f %f %f\n", (x+1)*PCD_SCALE, (y+1)*PCD_SCALE, (z+1)*PCD_SCALE);
-                                fprintf(fp_stl,"endloop\n");
-                                fprintf(fp_stl,"endfacet\n");
-                            }
-
-                            if (point_cloud_data(x,y-1,z) == 0) {
-                                fprintf(fp_stl,"facet normal 0 -1 0\n");
-                                fprintf(fp_stl,"outer loop\n");
-                                fprintf(fp_stl,"vertex %f %f %f\n", (x+1)*PCD_SCALE, (y+0)*PCD_SCALE, (z+1)*PCD_SCALE);
-                                fprintf(fp_stl,"vertex %f %f %f\n", (x+0)*PCD_SCALE, (y+0)*PCD_SCALE, (z+1)*PCD_SCALE);
-                                fprintf(fp_stl,"vertex %f %f %f\n", (x+1)*PCD_SCALE, (y+0)*PCD_SCALE, (z+0)*PCD_SCALE);
-                                fprintf(fp_stl,"endloop\n");
-                                fprintf(fp_stl,"endfacet\n");
-                                fprintf(fp_stl,"facet normal 0 -1 0\n");
-                                fprintf(fp_stl,"outer loop\n");
-                                fprintf(fp_stl,"vertex %f %f %f\n", (x+0)*PCD_SCALE, (y+0)*PCD_SCALE, (z+0)*PCD_SCALE);
-                                fprintf(fp_stl,"vertex %f %f %f\n", (x+1)*PCD_SCALE, (y+0)*PCD_SCALE, (z+0)*PCD_SCALE);
-                                fprintf(fp_stl,"vertex %f %f %f\n", (x+0)*PCD_SCALE, (y+0)*PCD_SCALE, (z+1)*PCD_SCALE);
-                                fprintf(fp_stl,"endloop\n");
-                                fprintf(fp_stl,"endfacet\n");
-                            }
-                        }
-                    }
-                }
-            }
-            // write STL file footer
-            fprintf(fp_stl,"endsolid\n");
-            fclose(fp_stl);
+            save_as_stl(file_name);
 
             led_working = 0;
             cout << "finish" << endl;
@@ -485,4 +371,126 @@ int main() {
 #endif
 
     }
+}
+
+void save_as_stl(const char* file_name) {
+    FILE *fp_stl = fopen(file_name, "w");
+
+    // write STL file header
+    fprintf(fp_stl,"solid result-ascii\n");
+    
+    for (int z=1; z<PCD_POINTS-1; z++) {
+        for (int y=1; y<PCD_POINTS-1; y++) {
+            for (int x=1; x<PCD_POINTS-1; x++) {
+                if (point_cloud_data(x,y,z) == 1) {
+
+                    // STLファイルの出力
+                    if (point_cloud_data(x,y,z+1) == 0) {
+                        fprintf(fp_stl,"facet normal 0 0 1\n");
+                        fprintf(fp_stl,"outer loop\n");
+                        fprintf(fp_stl,"vertex %f %f %f\n", (x+0)*PCD_SCALE, (y+0)*PCD_SCALE, (z+1)*PCD_SCALE);
+                        fprintf(fp_stl,"vertex %f %f %f\n", (x+1)*PCD_SCALE, (y+0)*PCD_SCALE, (z+1)*PCD_SCALE);
+                        fprintf(fp_stl,"vertex %f %f %f\n", (x+0)*PCD_SCALE, (y+1)*PCD_SCALE, (z+1)*PCD_SCALE);
+                        fprintf(fp_stl,"endloop\n");
+                        fprintf(fp_stl,"endfacet\n");
+                        fprintf(fp_stl,"facet normal 0 0 1\n");
+                        fprintf(fp_stl,"outer loop\n");
+                        fprintf(fp_stl,"vertex %f %f %f\n", (x+1)*PCD_SCALE, (y+1)*PCD_SCALE, (z+1)*PCD_SCALE);
+                        fprintf(fp_stl,"vertex %f %f %f\n", (x+0)*PCD_SCALE, (y+1)*PCD_SCALE, (z+1)*PCD_SCALE);
+                        fprintf(fp_stl,"vertex %f %f %f\n", (x+1)*PCD_SCALE, (y+0)*PCD_SCALE, (z+1)*PCD_SCALE);
+                        fprintf(fp_stl,"endloop\n");
+                        fprintf(fp_stl,"endfacet\n");
+                    }
+
+                    if (point_cloud_data(x+1,y,z) == 0) {
+                        fprintf(fp_stl,"facet normal 1 0 0\n");
+                        fprintf(fp_stl,"outer loop\n");
+                        fprintf(fp_stl,"vertex %f %f %f\n", (x+1)*PCD_SCALE, (y+0)*PCD_SCALE, (z+1)*PCD_SCALE);
+                        fprintf(fp_stl,"vertex %f %f %f\n", (x+1)*PCD_SCALE, (y+0)*PCD_SCALE, (z+0)*PCD_SCALE);
+                        fprintf(fp_stl,"vertex %f %f %f\n", (x+1)*PCD_SCALE, (y+1)*PCD_SCALE, (z+1)*PCD_SCALE);
+                        fprintf(fp_stl,"endloop\n");
+                        fprintf(fp_stl,"endfacet\n");
+                        fprintf(fp_stl,"facet normal 1 0 0\n");
+                        fprintf(fp_stl,"outer loop\n");
+                        fprintf(fp_stl,"vertex %f %f %f\n", (x+1)*PCD_SCALE, (y+1)*PCD_SCALE, (z+0)*PCD_SCALE);
+                        fprintf(fp_stl,"vertex %f %f %f\n", (x+1)*PCD_SCALE, (y+1)*PCD_SCALE, (z+1)*PCD_SCALE);
+                        fprintf(fp_stl,"vertex %f %f %f\n", (x+1)*PCD_SCALE, (y+0)*PCD_SCALE, (z+0)*PCD_SCALE);
+                        fprintf(fp_stl,"endloop\n");
+                        fprintf(fp_stl,"endfacet\n");
+                    }
+
+                    if (point_cloud_data(x,y,z-1) == 0) {
+                        fprintf(fp_stl,"facet normal 0 0 -1\n");
+                        fprintf(fp_stl,"outer loop\n");
+                        fprintf(fp_stl,"vertex %f %f %f\n", (x+1)*PCD_SCALE, (y+0)*PCD_SCALE, (z+0)*PCD_SCALE);
+                        fprintf(fp_stl,"vertex %f %f %f\n", (x+0)*PCD_SCALE, (y+0)*PCD_SCALE, (z+0)*PCD_SCALE);
+                        fprintf(fp_stl,"vertex %f %f %f\n", (x+1)*PCD_SCALE, (y+1)*PCD_SCALE, (z+0)*PCD_SCALE);
+                        fprintf(fp_stl,"endloop\n");
+                        fprintf(fp_stl,"endfacet\n");
+                        fprintf(fp_stl,"facet normal 0 0 -1\n");
+                        fprintf(fp_stl,"outer loop\n");
+                        fprintf(fp_stl,"vertex %f %f %f\n", (x+0)*PCD_SCALE, (y+1)*PCD_SCALE, (z+0)*PCD_SCALE);
+                        fprintf(fp_stl,"vertex %f %f %f\n", (x+1)*PCD_SCALE, (y+1)*PCD_SCALE, (z+0)*PCD_SCALE);
+                        fprintf(fp_stl,"vertex %f %f %f\n", (x+0)*PCD_SCALE, (y+0)*PCD_SCALE, (z+0)*PCD_SCALE);
+                        fprintf(fp_stl,"endloop\n");
+                        fprintf(fp_stl,"endfacet\n");
+                    }
+
+                    if (point_cloud_data(x-1,y,z) == 0) {
+                        fprintf(fp_stl,"facet normal -1 0 0\n");
+                        fprintf(fp_stl,"outer loop\n");
+                        fprintf(fp_stl,"vertex %f %f %f\n", (x+0)*PCD_SCALE, (y+0)*PCD_SCALE, (z+0)*PCD_SCALE);
+                        fprintf(fp_stl,"vertex %f %f %f\n", (x+0)*PCD_SCALE, (y+0)*PCD_SCALE, (z+1)*PCD_SCALE);
+                        fprintf(fp_stl,"vertex %f %f %f\n", (x+0)*PCD_SCALE, (y+1)*PCD_SCALE, (z+0)*PCD_SCALE);
+                        fprintf(fp_stl,"endloop\n");
+                        fprintf(fp_stl,"endfacet\n");
+                        fprintf(fp_stl,"facet normal -1 0 0\n");
+                        fprintf(fp_stl,"outer loop\n");
+                        fprintf(fp_stl,"vertex %f %f %f\n", (x+0)*PCD_SCALE, (y+1)*PCD_SCALE, (z+1)*PCD_SCALE);
+                        fprintf(fp_stl,"vertex %f %f %f\n", (x+0)*PCD_SCALE, (y+1)*PCD_SCALE, (z+0)*PCD_SCALE);
+                        fprintf(fp_stl,"vertex %f %f %f\n", (x+0)*PCD_SCALE, (y+0)*PCD_SCALE, (z+1)*PCD_SCALE);
+                        fprintf(fp_stl,"endloop\n");
+                        fprintf(fp_stl,"endfacet\n");
+                    }
+
+                    if (point_cloud_data(x,y+1,z) == 0) {
+                        fprintf(fp_stl,"facet normal 0 1 0\n");
+                        fprintf(fp_stl,"outer loop\n");
+                        fprintf(fp_stl,"vertex %f %f %f\n", (x+0)*PCD_SCALE, (y+1)*PCD_SCALE, (z+1)*PCD_SCALE);
+                        fprintf(fp_stl,"vertex %f %f %f\n", (x+1)*PCD_SCALE, (y+1)*PCD_SCALE, (z+1)*PCD_SCALE);
+                        fprintf(fp_stl,"vertex %f %f %f\n", (x+0)*PCD_SCALE, (y+1)*PCD_SCALE, (z+0)*PCD_SCALE);
+                        fprintf(fp_stl,"endloop\n");
+                        fprintf(fp_stl,"endfacet\n");
+                        fprintf(fp_stl,"facet normal 0 1 0\n");
+                        fprintf(fp_stl,"outer loop\n");
+                        fprintf(fp_stl,"vertex %f %f %f\n", (x+1)*PCD_SCALE, (y+1)*PCD_SCALE, (z+0)*PCD_SCALE);
+                        fprintf(fp_stl,"vertex %f %f %f\n", (x+0)*PCD_SCALE, (y+1)*PCD_SCALE, (z+0)*PCD_SCALE);
+                        fprintf(fp_stl,"vertex %f %f %f\n", (x+1)*PCD_SCALE, (y+1)*PCD_SCALE, (z+1)*PCD_SCALE);
+                        fprintf(fp_stl,"endloop\n");
+                        fprintf(fp_stl,"endfacet\n");
+                    }
+
+                    if (point_cloud_data(x,y-1,z) == 0) {
+                        fprintf(fp_stl,"facet normal 0 -1 0\n");
+                        fprintf(fp_stl,"outer loop\n");
+                        fprintf(fp_stl,"vertex %f %f %f\n", (x+1)*PCD_SCALE, (y+0)*PCD_SCALE, (z+1)*PCD_SCALE);
+                        fprintf(fp_stl,"vertex %f %f %f\n", (x+0)*PCD_SCALE, (y+0)*PCD_SCALE, (z+1)*PCD_SCALE);
+                        fprintf(fp_stl,"vertex %f %f %f\n", (x+1)*PCD_SCALE, (y+0)*PCD_SCALE, (z+0)*PCD_SCALE);
+                        fprintf(fp_stl,"endloop\n");
+                        fprintf(fp_stl,"endfacet\n");
+                        fprintf(fp_stl,"facet normal 0 -1 0\n");
+                        fprintf(fp_stl,"outer loop\n");
+                        fprintf(fp_stl,"vertex %f %f %f\n", (x+0)*PCD_SCALE, (y+0)*PCD_SCALE, (z+0)*PCD_SCALE);
+                        fprintf(fp_stl,"vertex %f %f %f\n", (x+1)*PCD_SCALE, (y+0)*PCD_SCALE, (z+0)*PCD_SCALE);
+                        fprintf(fp_stl,"vertex %f %f %f\n", (x+0)*PCD_SCALE, (y+0)*PCD_SCALE, (z+1)*PCD_SCALE);
+                        fprintf(fp_stl,"endloop\n");
+                        fprintf(fp_stl,"endfacet\n");
+                    }
+                }
+            }
+        }
+    }
+    // write STL file footer
+    fprintf(fp_stl,"endsolid\n");
+    fclose(fp_stl);
 }

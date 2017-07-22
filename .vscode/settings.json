@@ -23,6 +23,9 @@
         "functional": "cpp",
         "istream": "cpp",
         "tuple": "cpp",
-        "utility": "cpp"
+        "utility": "cpp",
+        "bitset": "cpp",
+        "lwip_httpd.c": "cpp",
+        "memp.c": "cpp"
     }
 }
