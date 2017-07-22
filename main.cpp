@@ -50,11 +50,10 @@ DigitalOut  led1(LED1);
 bitset<PCD_POINTS*PCD_POINTS*PCD_POINTS> point_cloud_data;   // 仮想物体（復元する点群）
 #define point_cloud_data(x,y,z)  point_cloud_data[(x) + ((y)*PCD_POINTS) + (PCD_POINTS*PCD_POINTS*(z))]
 
-static cv::Mat img_silhouette;      // 輪郭画像
-static cv::Mat img_background;      // 背景画像
-static bool has_background = false; // 背景画像を取得済かどうかを管理するフラグ
-static int reconst_count = 1;       // 復元結果ファイルのインデックス
-static char file_name[32];          // 出力ファイル名
+cv::Mat img_background;      // 背景画像
+bool has_background = false; // 背景画像を取得済かどうかを管理するフラグ
+int reconst_count = 1;       // 復元結果ファイルのインデックス
+char file_name[32];          // 出力ファイル名
 
 #define MOUNT_NAME             "storage"
 
@@ -137,6 +136,7 @@ void reconst(double rad) {
     cv::Mat img_yuv(VIDEO_PIXEL_VW, VIDEO_PIXEL_HW, CV_8UC2, user_frame_buffer0);
 
     // Convert from YUV422 to grayscale
+    cv::Mat img_silhouette;
     cv::cvtColor(img_yuv, img_silhouette, CV_YUV2GRAY_YUY2);
 
     // 背景画像の除去と輪郭画像の取得
@@ -358,8 +358,8 @@ int main() {
             cout << "writting..." << endl;
             led_working = 1;
 
-            sprintf(file_name, "/"MOUNT_NAME"/result_%d.stl", reconst_count);
-            save_as_stl(file_name);
+            // sprintf(file_name, "/"MOUNT_NAME"/result_%d.stl", reconst_count);
+            // save_as_stl(file_name);
             sprintf(file_name, "/"MOUNT_NAME"/result_%d.ply", reconst_count);
             save_as_ply(file_name);
             reconst_count++;
@@ -412,40 +412,156 @@ void save_as_ply(const char* file_name) {
     fprintf(fp_ply,"property list uint8 int32 vertex_indices\n");
     fprintf(fp_ply,"end_header\n");
 
+    // 正面
+    {
+        cv::Mat image;
+        cv::Mat img_yuv(VIDEO_PIXEL_VW, VIDEO_PIXEL_HW, CV_8UC2, user_frame_buffer0);
+        cv::cvtColor(img_yuv, image, CV_YUV2RGB_YUY2);
+
+        for (z=1; z<PCD_POINTS-1; z++) {
+            for (y=1; y<PCD_POINTS-1; y++) {
+                for (x=1; x<PCD_POINTS-1; x++) {
+                    if (point_cloud_data(x,y,z) == 1) {
+
+                        if (point_cloud_data(x,y,z+1) == 0) {
+                            int u, v;
+                            double xx= (x - PCD_POINTS / 2) * PCD_SCALE;
+                            double yy= (y - PCD_POINTS / 2) * PCD_SCALE;
+                            double zz= (z - PCD_POINTS / 2) * PCD_SCALE;
+                            int ret = projection(0, xx, yy, zz, u, v);
+
+                            int r = image.at<cv::Vec3b>(v, u)[0]; //Red
+                            int g = image.at<cv::Vec3b>(v, u)[1]; //Green
+                            int b = image.at<cv::Vec3b>(v, u)[2]; //Blue
+                            
+                            fprintf(fp_ply,"%f %f %f %d %d %d\n", x    *PCD_SCALE, y    *PCD_SCALE, (z+1)*PCD_SCALE, r, g, b);
+                            fprintf(fp_ply,"%f %f %f %d %d %d\n", (x+1)*PCD_SCALE, y    *PCD_SCALE, (z+1)*PCD_SCALE, r, g, b);
+                            fprintf(fp_ply,"%f %f %f %d %d %d\n", (x+1)*PCD_SCALE, (y+1)*PCD_SCALE, (z+1)*PCD_SCALE, r, g, b);
+                            fprintf(fp_ply,"%f %f %f %d %d %d\n", x    *PCD_SCALE, (y+1)*PCD_SCALE, (z+1)*PCD_SCALE, r, g, b);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // 側面
+    {
+        // テーブルの回転(★TBD)
+        double rad = (double)(2*3.14)*(0.25);
+        rotate(200);
+
+        cv::Mat image;
+        cv::Mat img_yuv(VIDEO_PIXEL_VW, VIDEO_PIXEL_HW, CV_8UC2, user_frame_buffer0);
+        cv::cvtColor(img_yuv, image, CV_YUV2RGB_YUY2);
+
+        for (z=1; z<PCD_POINTS-1; z++) {
+            for (y=1; y<PCD_POINTS-1; y++) {
+                for (x=1; x<PCD_POINTS-1; x++) {
+                    if (point_cloud_data(x,y,z) == 1) {
+
+                        if (point_cloud_data(x+1,y,z) == 0) {
+                            int u, v;
+                            double xx= (x - PCD_POINTS / 2) * PCD_SCALE;
+                            double yy= (y - PCD_POINTS / 2) * PCD_SCALE;
+                            double zz= (z - PCD_POINTS / 2) * PCD_SCALE;
+                            int ret = projection(rad, xx, yy, zz, u, v);
+
+                            int r = image.at<cv::Vec3b>(v, u)[0]; //Red
+                            int g = image.at<cv::Vec3b>(v, u)[1]; //Green
+                            int b = image.at<cv::Vec3b>(v, u)[2]; //Blue
+                            
+                            fprintf(fp_ply,"%f %f %f %d %d %d\n", (x+1)*PCD_SCALE, y    *PCD_SCALE, z    *PCD_SCALE, r, g, b);
+                            fprintf(fp_ply,"%f %f %f %d %d %d\n", (x+1)*PCD_SCALE, (y+1)*PCD_SCALE, z    *PCD_SCALE, r, g, b);
+                            fprintf(fp_ply,"%f %f %f %d %d %d\n", (x+1)*PCD_SCALE, (y+1)*PCD_SCALE, (z+1)*PCD_SCALE, r, g, b);
+                            fprintf(fp_ply,"%f %f %f %d %d %d\n", (x+1)*PCD_SCALE, y    *PCD_SCALE, (z+1)*PCD_SCALE, r, g, b);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // 背面
+    {
+        // テーブルの回転(★TBD)
+        double rad = (double)(2*3.14)*(0.50);
+        rotate(200);
+
+        cv::Mat image;
+        cv::Mat img_yuv(VIDEO_PIXEL_VW, VIDEO_PIXEL_HW, CV_8UC2, user_frame_buffer0);
+        cv::cvtColor(img_yuv, image, CV_YUV2RGB_YUY2);
+
+        for (z=1; z<PCD_POINTS-1; z++) {
+            for (y=1; y<PCD_POINTS-1; y++) {
+                for (x=1; x<PCD_POINTS-1; x++) {
+                    if (point_cloud_data(x,y,z) == 1) {
+
+                        if (point_cloud_data(x,y,z-1) == 0) {
+                            int u, v;
+                            double xx= (x - PCD_POINTS / 2) * PCD_SCALE;
+                            double yy= (y - PCD_POINTS / 2) * PCD_SCALE;
+                            double zz= (z - PCD_POINTS / 2) * PCD_SCALE;
+                            int ret = projection(rad, xx, yy, zz, u, v);
+
+                            int r = image.at<cv::Vec3b>(v, u)[0]; //Red
+                            int g = image.at<cv::Vec3b>(v, u)[1]; //Green
+                            int b = image.at<cv::Vec3b>(v, u)[2]; //Blue
+                            
+                            fprintf(fp_ply,"%f %f %f %d %d %d\n", x    *PCD_SCALE, y    *PCD_SCALE, z    *PCD_SCALE, r, g, b);
+                            fprintf(fp_ply,"%f %f %f %d %d %d\n", x    *PCD_SCALE, (y+1)*PCD_SCALE, z    *PCD_SCALE, r, g, b);
+                            fprintf(fp_ply,"%f %f %f %d %d %d\n", (x+1)*PCD_SCALE, (y+1)*PCD_SCALE, z    *PCD_SCALE, r, g, b);
+                            fprintf(fp_ply,"%f %f %f %d %d %d\n", (x+1)*PCD_SCALE, y    *PCD_SCALE, z    *PCD_SCALE, r, g, b);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // 側面
+    {
+        // テーブルの回転(★TBD)
+        double rad = (double)(2*3.14)*(0.75);
+        rotate(200);
+
+        cv::Mat image;
+        cv::Mat img_yuv(VIDEO_PIXEL_VW, VIDEO_PIXEL_HW, CV_8UC2, user_frame_buffer0);
+        cv::cvtColor(img_yuv, image, CV_YUV2RGB_YUY2);
+
+        for (z=1; z<PCD_POINTS-1; z++) {
+            for (y=1; y<PCD_POINTS-1; y++) {
+                for (x=1; x<PCD_POINTS-1; x++) {
+                    if (point_cloud_data(x,y,z) == 1) {
+
+                        if (point_cloud_data(x-1,y,z) == 0) {
+                            int u, v;
+                            double xx= (x - PCD_POINTS / 2) * PCD_SCALE;
+                            double yy= (y - PCD_POINTS / 2) * PCD_SCALE;
+                            double zz= (z - PCD_POINTS / 2) * PCD_SCALE;
+                            int ret = projection(rad, xx, yy, zz, u, v);
+
+                            int r = image.at<cv::Vec3b>(v, u)[0]; //Red
+                            int g = image.at<cv::Vec3b>(v, u)[1]; //Green
+                            int b = image.at<cv::Vec3b>(v, u)[2]; //Blue
+
+                            fprintf(fp_ply,"%f %f %f %d %d %d\n", x    *PCD_SCALE, y    *PCD_SCALE, z    *PCD_SCALE, r, g, b);
+                            fprintf(fp_ply,"%f %f %f %d %d %d\n", x    *PCD_SCALE, y    *PCD_SCALE, (z+1)*PCD_SCALE, r, g, b);
+                            fprintf(fp_ply,"%f %f %f %d %d %d\n", x    *PCD_SCALE, (y+1)*PCD_SCALE, (z+1)*PCD_SCALE, r, g, b);
+                            fprintf(fp_ply,"%f %f %f %d %d %d\n", x    *PCD_SCALE, (y+1)*PCD_SCALE, z    *PCD_SCALE, r, g, b);
+                        }
+                    }
+                }
+            }
+        }
+        rotate(200);
+    }
+
     // Vertexの出力
     for (z=1; z<PCD_POINTS-1; z++) {
         for (y=1; y<PCD_POINTS-1; y++) {
             for (x=1; x<PCD_POINTS-1; x++) {
                 if (point_cloud_data(x,y,z) == 1) {
-
-                    if (point_cloud_data(x,y,z-1) == 0) {
-                        fprintf(fp_ply,"%f %f %f 200 200 200\n", x    *PCD_SCALE, y    *PCD_SCALE, z    *PCD_SCALE);
-                        fprintf(fp_ply,"%f %f %f 200 200 200\n", x    *PCD_SCALE, (y+1)*PCD_SCALE, z    *PCD_SCALE);
-                        fprintf(fp_ply,"%f %f %f 200 200 200\n", (x+1)*PCD_SCALE, (y+1)*PCD_SCALE, z    *PCD_SCALE);
-                        fprintf(fp_ply,"%f %f %f 200 200 200\n", (x+1)*PCD_SCALE, y    *PCD_SCALE, z    *PCD_SCALE);
-                    }
-
-                    if (point_cloud_data(x,y,z+1) == 0) {
-                        fprintf(fp_ply,"%f %f %f 200 200 200\n", x    *PCD_SCALE, y    *PCD_SCALE, (z+1)*PCD_SCALE);
-                        fprintf(fp_ply,"%f %f %f 200 200 200\n", (x+1)*PCD_SCALE, y    *PCD_SCALE, (z+1)*PCD_SCALE);
-                        fprintf(fp_ply,"%f %f %f 200 200 200\n", (x+1)*PCD_SCALE, (y+1)*PCD_SCALE, (z+1)*PCD_SCALE);
-                        fprintf(fp_ply,"%f %f %f 200 200 200\n", x    *PCD_SCALE, (y+1)*PCD_SCALE, (z+1)*PCD_SCALE);
-                    }
-
-                    if (point_cloud_data(x-1,y,z) == 0) {
-                        fprintf(fp_ply,"%f %f %f 200 200 200\n", x    *PCD_SCALE, y    *PCD_SCALE, z    *PCD_SCALE);
-                        fprintf(fp_ply,"%f %f %f 200 200 200\n", x    *PCD_SCALE, y    *PCD_SCALE, (z+1)*PCD_SCALE);
-                        fprintf(fp_ply,"%f %f %f 200 200 200\n", x    *PCD_SCALE, (y+1)*PCD_SCALE, (z+1)*PCD_SCALE);
-                        fprintf(fp_ply,"%f %f %f 200 200 200\n", x    *PCD_SCALE, (y+1)*PCD_SCALE, z    *PCD_SCALE);
-                    }
-
-                    if (point_cloud_data(x+1,y,z) == 0) {
-                        fprintf(fp_ply,"%f %f %f 200 200 200\n", (x+1)*PCD_SCALE, y    *PCD_SCALE, z    *PCD_SCALE);
-                        fprintf(fp_ply,"%f %f %f 200 200 200\n", (x+1)*PCD_SCALE, (y+1)*PCD_SCALE, z    *PCD_SCALE);
-                        fprintf(fp_ply,"%f %f %f 200 200 200\n", (x+1)*PCD_SCALE, (y+1)*PCD_SCALE, (z+1)*PCD_SCALE);
-                        fprintf(fp_ply,"%f %f %f 200 200 200\n", (x+1)*PCD_SCALE, y    *PCD_SCALE, (z+1)*PCD_SCALE);
-                    }
-
                     if (point_cloud_data(x,y-1,z) == 0) {
                         fprintf(fp_ply,"%f %f %f 200 200 200\n", x    *PCD_SCALE, y    *PCD_SCALE, z    *PCD_SCALE);
                         fprintf(fp_ply,"%f %f %f 200 200 200\n", (x+1)*PCD_SCALE, y    *PCD_SCALE, z    *PCD_SCALE);
