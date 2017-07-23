@@ -46,8 +46,6 @@ int reconst_count = 1;       // 復元結果ファイルのインデックス
 char file_name[32];          // 出力ファイル名
 int file_name_index = 1;     // 出力ファイル名のインデックス
 
-#define MOUNT_NAME             "storage"
-
 /* For viewing image on PC */
 static DisplayApp  display_app;
 
@@ -83,7 +81,7 @@ void reconst(double rad) {
     cv::threshold(img_silhouette, img_silhouette, SILHOUETTE_THRESH_BINARY, 255, cv::THRESH_BINARY);
 
     // 輪郭画像の出力（デバッグ用）
-    // sprintf(file_name, "/"MOUNT_NAME"/img_%d.bmp", file_name_index);
+    // sprintf(file_name, "/storage/img_%d.bmp", file_name_index);
     // cv::imwrite(file_name, img_silhouette);
     // printf("Saved file %s\r\n", file_name);
 
@@ -144,10 +142,10 @@ int main() {
     led1 = 1;
 
     // SD & USB
-    SdUsbConnect storage(MOUNT_NAME);
+    SdUsbConnect storage("storage");
 
     // Stepping motor
-    a4988_dir = 0;
+    a4988_dir = STEPPER_DIRECTION;
     a4988_step = 0;
 
     while (1) {
@@ -159,7 +157,7 @@ int main() {
             create_gray(img_background);
 
             // 取得した背景画像の保存
-            sprintf(file_name, "/"MOUNT_NAME"/img_%d.jpg", file_name_index++);
+            sprintf(file_name, "/storage/img_%d.jpg", file_name_index++);
             save_image_jpg(file_name); // save as jpeg
             printf("Saved file %s\r\n", file_name);
 
@@ -182,7 +180,7 @@ int main() {
                 reconst(rad);
 
                 // 取得した画像の保存
-                sprintf(file_name, "/"MOUNT_NAME"/img_%d.jpg", file_name_index++);
+                sprintf(file_name, "/storage/img_%d.jpg", file_name_index++);
                 save_image_jpg(file_name); // save as jpeg
                 printf("Saved file %s\r\n", file_name);
 
@@ -199,11 +197,11 @@ int main() {
             cout << "writting..." << endl;
             led_working = 1;
 
-            sprintf(file_name, "/"MOUNT_NAME"/result_%d.xyz", reconst_count);
+            sprintf(file_name, "/storage/result_%d.xyz", reconst_count);
             point_cloud.save_as_xyz(file_name);
-            sprintf(file_name, "/"MOUNT_NAME"/result_%d.stl", reconst_count);
+            sprintf(file_name, "/storage/result_%d.stl", reconst_count);
             point_cloud.save_as_stl(file_name);
-            // sprintf(file_name, "/"MOUNT_NAME"/result_%d.ply", reconst_count);
+            // sprintf(file_name, "/storage/result_%d.ply", reconst_count);
             // point_cloud.save_as_ply(file_name);
 
             reconst_count++;
