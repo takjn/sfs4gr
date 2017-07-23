@@ -43,7 +43,7 @@ DigitalOut  led1(LED1);
 #define SILHOUETTE_THRESH_BINARY 30     // 二値化する際のしきい値
 
 // 復元関連のデータ
-bitset<PCD_POINTS*PCD_POINTS*PCD_POINTS> point_cloud_data;   // 仮想物体（復元する点群）
+PointCloud point_cloud;      // 仮想物体（復元する点群）
 
 cv::Mat img_background;      // 背景画像
 bool has_background = false; // 背景画像を取得済かどうかを管理するフラグ
@@ -154,15 +154,15 @@ void reconst(double rad) {
     int u,v;            // 復元対象の点の、カメラ画像内での座標値(x,y)
     int pcd_index=0;    // 仮想物体の復元対象点
 
-    zz = (-PCD_POINTS / 2) * PCD_SCALE;
-    for (int z=0; z<PCD_POINTS; z++, zz += PCD_SCALE) {
+    zz = (-point_cloud.POINTS / 2) * point_cloud.SCALE;
+    for (int z=0; z<point_cloud.POINTS; z++, zz += point_cloud.SCALE) {
 
-        yy = (-PCD_POINTS / 2) * PCD_SCALE;
-        for (int y=0; y<PCD_POINTS; y++, yy += PCD_SCALE) {
+        yy = (-point_cloud.POINTS / 2) * point_cloud.SCALE;
+        for (int y=0; y<point_cloud.POINTS; y++, yy += point_cloud.SCALE) {
 
-            xx = (-PCD_POINTS / 2) * PCD_SCALE;
-            for (int x=0; x<PCD_POINTS; x++, xx += PCD_SCALE, pcd_index++) {
-                if (point_cloud_data[pcd_index] == 1) {
+            xx = (-point_cloud.POINTS / 2) * point_cloud.SCALE;
+            for (int x=0; x<point_cloud.POINTS; x++, xx += point_cloud.SCALE, pcd_index++) {
+                if (point_cloud.get(pcd_index) == 1) {
                     
                     // 復元対象の点がカメラ画像内ではどこにあるかを計算する
                     if (projection(rad, xx, yy, zz, u, v)) {
@@ -172,11 +172,11 @@ void reconst(double rad) {
                         }
                         else {
                             // 復元対象の点は、輪郭画像外（黒色）のため、除去
-                            point_cloud_data[pcd_index] = 0;
+                            point_cloud.set(pcd_index, 0);
                         }
                     } else {
                         // カメラ画像外のためクリアする
-                        point_cloud_data[pcd_index] = 0;
+                        point_cloud.set(pcd_index, 0);
                     }
                 }
             }
@@ -287,8 +287,8 @@ int main() {
     a4988_dir = 0;
     a4988_step = 0;
 
-    // Point cloud data
-    clear_point_cloud_data(point_cloud_data);
+    // clear Point cloud data
+    point_cloud.clear();
 
     while (1) {
         storage.wait_connect();
@@ -326,23 +326,23 @@ int main() {
             }
 
             // 復元した立体形状データの修正
-            remove_edge(point_cloud_data);
+            point_cloud.remove_edge();
 
             // 復元した立体形状データの出力
             cout << "writting..." << endl;
             led_working = 1;
 
             sprintf(file_name, "/"MOUNT_NAME"/result_%d.xyz", reconst_count);
-            save_as_xyz(file_name, point_cloud_data);
+            point_cloud.save_as_xyz(file_name);
             sprintf(file_name, "/"MOUNT_NAME"/result_%d.stl", reconst_count);
-            save_as_stl(file_name, point_cloud_data);
-            sprintf(file_name, "/"MOUNT_NAME"/result_%d.ply", reconst_count);
-            save_as_ply(file_name, point_cloud_data);
+            point_cloud.save_as_stl(file_name);
+            // sprintf(file_name, "/"MOUNT_NAME"/result_%d.ply", reconst_count);
+            // point_cloud.save_as_ply(file_name);
             reconst_count++;
 
             led_working = 0;
             cout << "finish" << endl;
-            clear_point_cloud_data(point_cloud_data);
+            point_cloud.clear();
         }
 
 #if (DBG_PCMONITOR == 1)

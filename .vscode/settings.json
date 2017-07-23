@@ -32,6 +32,9 @@
         "spi_api.c": "cpp",
         "peer_id.c": "cpp",
         "fsl_ltc.c": "cpp",
-        "xdot_eeprom.c": "cpp"
+        "xdot_eeprom.c": "cpp",
+        "lwip_mdns.c": "cpp",
+        "gcm.c": "cpp",
+        "net_sockets.c": "cpp"
     }
 }
