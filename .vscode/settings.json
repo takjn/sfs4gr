@@ -26,6 +26,12 @@
         "utility": "cpp",
         "bitset": "cpp",
         "lwip_httpd.c": "cpp",
-        "memp.c": "cpp"
+        "memp.c": "cpp",
+        "lwip_ipcp.c": "cpp",
+        "md5.c": "cpp",
+        "spi_api.c": "cpp",
+        "peer_id.c": "cpp",
+        "fsl_ltc.c": "cpp",
+        "xdot_eeprom.c": "cpp"
     }
 }
