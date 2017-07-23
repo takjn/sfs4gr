@@ -9,6 +9,7 @@
 
 void save_as_stl(const char*);
 void save_as_ply(const char*);
+void save_as_xyz(const char*);
 
 // 筐体に依存するパラメーター
 #define CAMERA_DISTANCE 115     // 原点(ステッピングモーター回転軸)からカメラの距離(mm)
@@ -358,10 +359,12 @@ int main() {
             cout << "writting..." << endl;
             led_working = 1;
 
-            // sprintf(file_name, "/"MOUNT_NAME"/result_%d.stl", reconst_count);
-            // save_as_stl(file_name);
-            sprintf(file_name, "/"MOUNT_NAME"/result_%d.ply", reconst_count);
-            save_as_ply(file_name);
+            sprintf(file_name, "/"MOUNT_NAME"/result_%d.xyz", reconst_count);
+            save_as_xyz(file_name);
+            sprintf(file_name, "/"MOUNT_NAME"/result_%d.stl", reconst_count);
+            save_as_stl(file_name);
+            // sprintf(file_name, "/"MOUNT_NAME"/result_%d.ply", reconst_count);
+            // save_as_ply(file_name);
             reconst_count++;
 
             led_working = 0;
@@ -710,4 +713,35 @@ void save_as_stl(const char* file_name) {
     // write STL file footer
     fprintf(fp_stl,"endsolid\n");
     fclose(fp_stl);
+}
+
+// 点群データをXYZファイルとして保存
+void save_as_xyz(const char* file_name) {
+    FILE *fp_xyz = fopen(file_name, "w");
+
+    for (int z=1; z<PCD_POINTS-1; z++) {
+        for (int y=1; y<PCD_POINTS-1; y++) {
+            for (int x=1; x<PCD_POINTS-1; x++) {
+                if (point_cloud_data(x,y,z) == 1) {
+
+                    // 物体内部の点は出力しない
+                    int count = 0;
+                    for (int i=-1;i<2;i++) {
+                        for (int j=-1;j<2;j++) {
+                            for (int k=-1;k<2;k++) {
+                                if (point_cloud_data((x+i),(y+j),(z+k)) == 0) count++;
+                            }
+                        }
+                    }
+
+                    if (count>4) {
+                        // 点群データ(Point Cloud Data)の出力
+                        fprintf(fp_xyz,"%f -%f %f\n", x*PCD_SCALE, y*PCD_SCALE, z*PCD_SCALE);
+                    }
+                }
+            }
+        }
+    }
+
+    fclose(fp_xyz);
 }
