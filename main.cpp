@@ -1,12 +1,9 @@
 #include <bitset>
 #include "mbed.h"
-#include "EasyAttach_CameraAndLCD.h"
 #include "SdUsbConnect.h"
-#include "JPEG_Converter.h"
-#include "dcache-control.h"
-#include "opencv2/opencv.hpp"
 #include "DisplayApp.h"
 #include "tinypcl.hpp"
+#include "camera_if.hpp"
 
 // 筐体に依存するパラメーター
 #define CAMERA_DISTANCE 115     // 原点(ステッピングモーター回転軸)からカメラの距離(mm)
@@ -49,6 +46,7 @@ cv::Mat img_background;      // 背景画像
 bool has_background = false; // 背景画像を取得済かどうかを管理するフラグ
 int reconst_count = 1;       // 復元結果ファイルのインデックス
 char file_name[32];          // 出力ファイル名
+int file_name_index = 1;     // 出力ファイル名のインデックス
 
 #define MOUNT_NAME             "storage"
 
@@ -58,47 +56,10 @@ char file_name[32];          // 出力ファイル名
 static DisplayApp  display_app;
 #endif
 
-
-/* Video input and LCD layer 0 output */
-#define VIDEO_FORMAT           (DisplayBase::VIDEO_FORMAT_YCBCR422)
-#define GRAPHICS_FORMAT        (DisplayBase::GRAPHICS_FORMAT_YCBCR422)
-#define WR_RD_WRSWA            (DisplayBase::WR_RD_WRSWA_32_16BIT)
-#define DATA_SIZE_PER_PIC      (2u)
-
-/*! Frame buffer stride: Frame buffer stride should be set to a multiple of 32 or 128
-    in accordance with the frame buffer burst transfer mode. */
-#define VIDEO_PIXEL_HW         (640u)  /* VGA */
-#define VIDEO_PIXEL_VW         (480u)  /* VGA */
-
-#define FRAME_BUFFER_STRIDE    (((VIDEO_PIXEL_HW * DATA_SIZE_PER_PIC) + 31u) & ~31u)
-#define FRAME_BUFFER_HEIGHT    (VIDEO_PIXEL_VW)
-
-#if defined(__ICCARM__)
-#pragma data_alignment=32
-static uint8_t user_frame_buffer0[FRAME_BUFFER_STRIDE * FRAME_BUFFER_HEIGHT]@ ".mirrorram";
-#pragma data_alignment=4
-#else
-static uint8_t user_frame_buffer0[FRAME_BUFFER_STRIDE * FRAME_BUFFER_HEIGHT]__attribute((section("NC_BSS"),aligned(32)));
-#endif
-static int file_name_index = 1;
-/* jpeg convert */
-static JPEG_Converter Jcu;
-#if defined(__ICCARM__)
-#pragma data_alignment=32
-static uint8_t JpegBuffer[1024 * 63];
-#else
-static uint8_t JpegBuffer[1024 * 63]__attribute((aligned(32)));
-#endif
-
-DisplayBase Display;
-
 // 背景画像の取得
 void get_background_image(void) {
-    // Transform buffer into OpenCV Mat
-    cv::Mat img_yuv(VIDEO_PIXEL_VW, VIDEO_PIXEL_HW, CV_8UC2, user_frame_buffer0);
-
-    // Convert from YUV422 to grayscale
-    cv::cvtColor(img_yuv, img_background, CV_YUV2GRAY_YUY2);
+    // Takes a video frame in grayscale(see camera_if.cpp)
+    create_gray(img_background);
 
     // set flag
     has_background = true;
@@ -127,12 +88,9 @@ int projection(double rad, double Xw, double Yw,double Zw, int &u, int &v)
 // 輪郭画像からの立体形状復元
 // 3d reconstruction from silhouette
 void reconst(double rad) {
-    // Transform buffer into OpenCV Mat
-    cv::Mat img_yuv(VIDEO_PIXEL_VW, VIDEO_PIXEL_HW, CV_8UC2, user_frame_buffer0);
-
-    // Convert from YUV422 to grayscale
+    // Takes a video frame in grayscale(see camera_if.cpp)
     cv::Mat img_silhouette;
-    cv::cvtColor(img_yuv, img_silhouette, CV_YUV2GRAY_YUY2);
+    create_gray(img_silhouette);
 
     // 背景画像の除去と輪郭画像の取得
     // Background subtraction and get silhouette
@@ -195,89 +153,9 @@ void rotate(int steps) {
     }
 }
 
-static void save_image_jpg(void) {
-    size_t jcu_encode_size;
-    JPEG_Converter::bitmap_buff_info_t bitmap_buff_info;
-    JPEG_Converter::encode_options_t   encode_options;
-
-    bitmap_buff_info.width              = VIDEO_PIXEL_HW;
-    bitmap_buff_info.height             = VIDEO_PIXEL_VW;
-    bitmap_buff_info.format             = JPEG_Converter::WR_RD_YCbCr422;
-    bitmap_buff_info.buffer_address     = (void *)user_frame_buffer0;
-
-    encode_options.encode_buff_size     = sizeof(JpegBuffer);
-    encode_options.p_EncodeCallBackFunc = NULL;
-    encode_options.input_swapsetting    = JPEG_Converter::WR_RD_WRSWA_32_16_8BIT;
-
-    jcu_encode_size = 0;
-    dcache_invalid(JpegBuffer, sizeof(JpegBuffer));
-    if (Jcu.encode(&bitmap_buff_info, JpegBuffer, &jcu_encode_size, &encode_options) != JPEG_Converter::JPEG_CONV_OK) {
-        jcu_encode_size = 0;
-    }
-
-    sprintf(file_name, "/"MOUNT_NAME"/img_%d.jpg", file_name_index);
-    FILE * fp = fopen(file_name, "w");
-    fwrite(JpegBuffer, sizeof(char), (int)jcu_encode_size, fp);
-    fclose(fp);
-    printf("Saved file %s\r\n", file_name);
-}
-
-static void Start_Video_Camera(void) {
-    // Video capture setting (progressive form fixed)
-    Display.Video_Write_Setting(
-        DisplayBase::VIDEO_INPUT_CHANNEL_0,
-        DisplayBase::COL_SYS_NTSC_358,
-        (void *)user_frame_buffer0,
-        FRAME_BUFFER_STRIDE,
-        VIDEO_FORMAT,
-        WR_RD_WRSWA,
-        VIDEO_PIXEL_VW,
-        VIDEO_PIXEL_HW
-    );
-    EasyAttach_CameraStart(Display, DisplayBase::VIDEO_INPUT_CHANNEL_0);
-}
-
-
-size_t encode_jpeg(uint8_t* buf, int len, int width, int height, uint8_t* inbuf) {
-    size_t encode_size;
-    JPEG_Converter::bitmap_buff_info_t bitmap_buff_info;
-    JPEG_Converter::encode_options_t encode_options;
-    bitmap_buff_info.width = width;
-    bitmap_buff_info.height = height;
-    bitmap_buff_info.format = JPEG_Converter::WR_RD_YCbCr422;
-    bitmap_buff_info.buffer_address = (void *) inbuf;
-    encode_options.encode_buff_size = len;
-    encode_options.p_EncodeCallBackFunc = NULL;
-    encode_options.input_swapsetting = JPEG_Converter::WR_RD_WRSWA_32_16_8BIT;
-
-    encode_size = 0;
-    dcache_invalid(buf, len);
-    if (Jcu.encode(&bitmap_buff_info, buf, &encode_size, &encode_options)
-            != JPEG_Converter::JPEG_CONV_OK) {
-        encode_size = 0;
-    }
-
-    return encode_size;
-}
-
-size_t create_jpeg(){
-    return encode_jpeg(JpegBuffer, sizeof(JpegBuffer), VIDEO_PIXEL_HW, VIDEO_PIXEL_VW, user_frame_buffer0);
-}
-
-uint8_t* get_jpeg_adr(){
-    return JpegBuffer;
-}
-
 int main() {
-    // Initialize the background to black
-    for (int i = 0; i < sizeof(user_frame_buffer0); i += 2) {
-        user_frame_buffer0[i + 0] = 0x10;
-        user_frame_buffer0[i + 1] = 0x80;
-    }
-
     // Camera
-    EasyAttach_Init(Display);
-    Start_Video_Camera();
+    camera_start();
     led1 = 1;
 
     // SD & USB
@@ -297,8 +175,12 @@ int main() {
             // 背景画像の取得
             led_working = 1;
             get_background_image(); // get background image
-            save_image_jpg(); // save as jpeg
-            file_name_index++;
+
+            // 取得した背景画像の保存
+            sprintf(file_name, "/"MOUNT_NAME"/img_%d.jpg", file_name_index++);
+            save_image_jpg(file_name); // save as jpeg
+            printf("Saved file %s\r\n", file_name);
+
             led_working = 0;
 
             wait_ms(100);
@@ -317,9 +199,13 @@ int main() {
                 led_working = 1;
                 double rad = (double)(2*3.14)*((double)i/(STEPPER_STEPS/STEPPER_STEP));
                 reconst(rad);
-                save_image_jpg(); // save as jpeg
+
+                // 取得した画像の保存
+                sprintf(file_name, "/"MOUNT_NAME"/img_%d.jpg", file_name_index++);
+                save_image_jpg(file_name); // save as jpeg
+                printf("Saved file %s\r\n", file_name);
+
                 led_working = 0;
-                file_name_index++;
 
                 // テーブルの回転
                 rotate(STEPPER_STEP);
