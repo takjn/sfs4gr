@@ -6,7 +6,7 @@
 #include "dcache-control.h"
 #include "opencv2/opencv.hpp"
 #include "DisplayApp.h"
-#include "pcd.h"
+#include "tinypcl.hpp"
 
 // 筐体に依存するパラメーター
 #define CAMERA_DISTANCE 115     // 原点(ステッピングモーター回転軸)からカメラの距離(mm)

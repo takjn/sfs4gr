@@ -27,9 +27,9 @@
 
 #include <bitset>
 #include <stdio.h>
-#include "pcd.h"
+#include "tinypcl.hpp"
 
-PointCloud::PointCloud(unsigned int POINTS, float SCALE) {
+PointCloud::PointCloud(void) {
     clear();
 }
 
@@ -52,7 +52,7 @@ void PointCloud::set(unsigned int x, unsigned int y, unsigned int z, unsigned ch
 }
 
 // 点群データの初期化
-void PointCloud::clear() {
+void PointCloud::clear(void) {
     for (int z=0;z<POINTS;z++) {
         for (int y=0;y<POINTS;y++) {
             for (int x=0;x<POINTS;x++) {
@@ -63,7 +63,7 @@ void PointCloud::clear() {
 }
 
 // 外周部のデータの削除（メッシュ化に必要）
-void PointCloud::remove_edge() {
+void PointCloud::remove_edge(void) {
     for (int i=0; i<POINTS; i++) {
         for (int j=0; j<POINTS; j++) {
             // 外周部は除去

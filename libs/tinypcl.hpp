@@ -24,14 +24,15 @@
 **
 ** [ MIT license: http://www.opensource.org/licenses/mit-license.php ]
 */
-#ifndef PCD_H
-#define PCD_H
+#ifndef TINYPCL_HPP
+#define TINYPCL_HPP
 
 #include <bitset>
 using std::bitset;
 
-#define PCD_POINTS 100                  // 復元する空間範囲(mm)
-#define PCD_SCALE 1.0                   // 復元する間隔(mm)
+// 扱う空間の大きさ
+#define PCD_POINTS 100  // 点群の数
+#define PCD_SCALE 1.0   // 点群の間隔(mm)
 
 #define point_cloud_data(x,y,z)  point_cloud_data[(x) + ((y)*PCD_POINTS) + (PCD_POINTS*PCD_POINTS*(z))]
 
@@ -40,7 +41,7 @@ public:
     const static int POINTS = PCD_POINTS;
     const static float SCALE = PCD_SCALE;
 
-    PointCloud(unsigned int points = PCD_POINTS, float scale = PCD_SCALE);
+    PointCloud(void);
 
     unsigned char get(unsigned int index);
     unsigned char get(unsigned int x, unsigned int y, unsigned int z);
@@ -52,7 +53,7 @@ public:
     void save_as_ply(const char*);
     void save_as_xyz(const char*);
 private:
-    // 仮想物体（復元する点群）
+    // 仮想物体（点群）
     bitset<PCD_POINTS*PCD_POINTS*PCD_POINTS> point_cloud_data;
 };
 
