@@ -9,35 +9,34 @@
 #define CAMERA_DISTANCE 115     // 原点(ステッピングモーター回転軸)からカメラの距離(mm)
 #define CAMERA_OFFSET  3        // カメラ高さの調整(mm)
 
-// ステッピングモーターの出力ピン(ステッピングモータードライバとしてA4988を利用)
-DigitalOut a4988_step(D8);
-DigitalOut a4988_dir(D9);
-
-// ボタンの入力ピン
-DigitalIn   button0(D4);
-DigitalIn   button1(D6);
-
-// 状態表示LEDの出力ピン
-DigitalOut  led_working(D7);    // 処理中
-DigitalOut  led_ready(D5);      // 背景画像取得完了
-
-// デバッグ用（カメラが準備完了になった時にLED1を点灯）
-DigitalOut  led1(LED1);
-
-// ステッピングモーター関連のパラメーター
-#define STEPPER_DIRECTION 1     // ステッピングモーターの回転方向(0 または 1)
-#define STEPPER_WAIT    0.004   // wait
-#define STEPPER_STEPS   800     // 1周に必要なステップ数（Quarter step）
-#define STEPPER_STEP    20      // 1回のステップ数
-
 // カメラ内部パラメーター（OpenCVのカメラキャリブレーションが必要）
 #define CAMERA_CENTER_U 321     // 画像中心(横方向)
 #define CAMERA_CENTER_V 244     // 画像中心（縦方向）
 #define CAMERA_FX 365.202395    // カメラ焦点距離(fx)
 #define CAMERA_FY 365.519979    // カメラ焦点距離(fy)
 
+// ステッピングモーターの出力ピン(ステッピングモータードライバとしてA4988を利用)
+DigitalOut a4988_step(D8);      // connect the pin to A4988 step
+DigitalOut a4988_dir(D9);       // connect the pin to A4988 dir
+
+// ボタンの入力ピン
+DigitalIn   button0(D4);        // connect the pin to button0
+DigitalIn   button1(D6);        // connect the pin to button1
+
+// 状態表示LEDの出力ピン
+DigitalOut  led_working(D7);    // 処理中
+DigitalOut  led_ready(D5);      // 背景画像取得完了
+DigitalOut  led1(LED1);         // デバッグ用（カメラが準備完了になった時にLED1を点灯）
+
+// Stepper Motor Parameters
+#define STEPPER_DIRECTION   1       // direction (0 or 1)
+#define STEPPER_WAIT        0.004   // pulse duration
+#define STEPPER_STEP_COUNTS 200     // a 200 step motor is the same as a 1.8 degrees motor 
+#define STEPPER_STEP_RESOLUTIONS 4  // full-step = 1, half-step = 2, quarter-step = 4
+
 // 復元関連のパラメーター
-#define SILHOUETTE_THRESH_BINARY 30     // 二値化する際のしきい値
+#define SILHOUETTE_COUNTS           40  // 復元で利用する画像の枚数 
+#define SILHOUETTE_THRESH_BINARY    30  // 二値化する際のしきい値
 
 // 復元関連のデータ
 PointCloud point_cloud;      // 仮想物体（復元する点群）
@@ -50,11 +49,8 @@ int file_name_index = 1;     // 出力ファイル名のインデックス
 
 #define MOUNT_NAME             "storage"
 
-#define DBG_PCMONITOR (1)
-#if (DBG_PCMONITOR == 1)
 /* For viewing image on PC */
 static DisplayApp  display_app;
-#endif
 
 // 背景画像の取得
 void get_background_image(void) {
@@ -188,16 +184,14 @@ int main() {
         if (button1 == 0 && has_background) {
             // Shape from silhouette アルゴリズムによる立体形状復元
             // テーブルを回転させながら輪郭画像の取得と立体形状復元を繰り返す
-            for (int i=0;i<(STEPPER_STEPS/STEPPER_STEP);i++) {
-#if (DBG_PCMONITOR == 1)
+            for (int i = 0; i < SILHOUETTE_COUNTS; i++) {
                 // プレビュー画像の送信
                 size_t jpeg_size = create_jpeg();
                 display_app.SendJpeg(get_jpeg_adr(), jpeg_size);
-#endif
 
                 // 輪郭画像の取得と立体形状復元
                 led_working = 1;
-                double rad = (double)(2*3.14)*((double)i/(STEPPER_STEPS/STEPPER_STEP));
+                double rad = (double)(2 * 3.14159265258979)*((double)i / SILHOUETTE_COUNTS);
                 reconst(rad);
 
                 // 取得した画像の保存
@@ -208,7 +202,7 @@ int main() {
                 led_working = 0;
 
                 // テーブルの回転
-                rotate(STEPPER_STEP);
+                rotate(STEPPER_STEP_COUNTS * STEPPER_STEP_RESOLUTIONS / SILHOUETTE_COUNTS);
             }
 
             // 復元した立体形状データの修正
@@ -224,6 +218,7 @@ int main() {
             point_cloud.save_as_stl(file_name);
             // sprintf(file_name, "/"MOUNT_NAME"/result_%d.ply", reconst_count);
             // point_cloud.save_as_ply(file_name);
+
             reconst_count++;
 
             led_working = 0;
@@ -231,10 +226,7 @@ int main() {
             point_cloud.clear();
         }
 
-#if (DBG_PCMONITOR == 1)
         size_t jpeg_size = create_jpeg();
         display_app.SendJpeg(get_jpeg_adr(), jpeg_size);
-#endif
-
     }
 }
