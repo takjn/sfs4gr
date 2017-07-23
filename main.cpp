@@ -377,6 +377,7 @@ int main() {
     }
 }
 
+// 点群データをメッシュ化してplyファイルとして保存
 void save_as_ply(const char* file_name) {
     FILE *fp_ply = fopen(file_name, "w");
 
@@ -447,9 +448,9 @@ void save_as_ply(const char* file_name) {
 
     // 側面
     {
-        // テーブルの回転(★TBD)
+        // テーブルの回転
         double rad = (double)(2*3.14)*(0.25);
-        rotate(200);
+        rotate(STEPPER_STEPS/4);
 
         cv::Mat image;
         cv::Mat img_yuv(VIDEO_PIXEL_VW, VIDEO_PIXEL_HW, CV_8UC2, user_frame_buffer0);
@@ -484,9 +485,9 @@ void save_as_ply(const char* file_name) {
 
     // 背面
     {
-        // テーブルの回転(★TBD)
+        // テーブルの回転
         double rad = (double)(2*3.14)*(0.50);
-        rotate(200);
+        rotate(STEPPER_STEPS/4);
 
         cv::Mat image;
         cv::Mat img_yuv(VIDEO_PIXEL_VW, VIDEO_PIXEL_HW, CV_8UC2, user_frame_buffer0);
@@ -521,9 +522,9 @@ void save_as_ply(const char* file_name) {
 
     // 側面
     {
-        // テーブルの回転(★TBD)
+        // テーブルの回転
         double rad = (double)(2*3.14)*(0.75);
-        rotate(200);
+        rotate(STEPPER_STEPS/4);
 
         cv::Mat image;
         cv::Mat img_yuv(VIDEO_PIXEL_VW, VIDEO_PIXEL_HW, CV_8UC2, user_frame_buffer0);
@@ -554,10 +555,10 @@ void save_as_ply(const char* file_name) {
                 }
             }
         }
-        rotate(200);
+        rotate(STEPPER_STEPS/4);
     }
 
-    // Vertexの出力
+    // 上面と底面の出力（色が取得できないため、固定色で出力）
     for (z=1; z<PCD_POINTS-1; z++) {
         for (y=1; y<PCD_POINTS-1; y++) {
             for (x=1; x<PCD_POINTS-1; x++) {
@@ -588,6 +589,7 @@ void save_as_ply(const char* file_name) {
 	fclose(fp_ply);
 }
 
+// 点群データをメッシュ化してSTLファイルとして保存
 void save_as_stl(const char* file_name) {
     FILE *fp_stl = fopen(file_name, "w");
 
