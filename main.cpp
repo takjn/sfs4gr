@@ -40,9 +40,8 @@ DigitalOut  led1(LED1);         // デバッグ用（カメラが準備完了に
 
 // 復元関連のデータ
 PointCloud point_cloud;      // 仮想物体（復元する点群）
-
 cv::Mat img_background;      // 背景画像
-bool has_background = false; // 背景画像を取得済かどうかを管理するフラグ
+
 int reconst_count = 1;       // 復元結果ファイルのインデックス
 char file_name[32];          // 出力ファイル名
 int file_name_index = 1;     // 出力ファイル名のインデックス
@@ -51,16 +50,6 @@ int file_name_index = 1;     // 出力ファイル名のインデックス
 
 /* For viewing image on PC */
 static DisplayApp  display_app;
-
-// 背景画像の取得
-void get_background_image(void) {
-    // Takes a video frame in grayscale(see camera_if.cpp)
-    create_gray(img_background);
-
-    // set flag
-    has_background = true;
-    led_ready = 1;
-}
 
 // 3次元座標から2次元座標への変換
 int projection(double rad, double Xw, double Yw,double Zw, int &u, int &v)
@@ -161,16 +150,13 @@ int main() {
     a4988_dir = 0;
     a4988_step = 0;
 
-    // clear Point cloud data
-    point_cloud.clear();
-
     while (1) {
         storage.wait_connect();
 
         if (button0 == 0) {
-            // 背景画像の取得
+            // Takes a video frame in grayscale (see camera_if.cpp) and set as a background image
             led_working = 1;
-            get_background_image(); // get background image
+            create_gray(img_background);
 
             // 取得した背景画像の保存
             sprintf(file_name, "/"MOUNT_NAME"/img_%d.jpg", file_name_index++);
@@ -178,10 +164,11 @@ int main() {
             printf("Saved file %s\r\n", file_name);
 
             led_working = 0;
+            led_ready = 1;
 
             wait_ms(100);
         }
-        if (button1 == 0 && has_background) {
+        if (button1 == 0 && !img_background.empty()) {
             // Shape from silhouette アルゴリズムによる立体形状復元
             // テーブルを回転させながら輪郭画像の取得と立体形状復元を繰り返す
             for (int i = 0; i < SILHOUETTE_COUNTS; i++) {
