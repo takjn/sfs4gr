@@ -1,3 +1,30 @@
+/*
+** tiny Point Cloud Library
+**
+** Copyright (c) 2017 Jun Takeda
+**
+** Permission is hereby granted, free of charge, to any person obtaining
+** a copy of this software and associated documentation files (the
+** "Software"), to deal in the Software without restriction, including
+** without limitation the rights to use, copy, modify, merge, publish,
+** distribute, sublicense, and/or sell copies of the Software, and to
+** permit persons to whom the Software is furnished to do so, subject to
+** the following conditions:
+**
+** The above copyright notice and this permission notice shall be
+** included in all copies or substantial portions of the Software.
+**
+** THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+** EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+** MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+** IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+** CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+** TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+** SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+**
+** [ MIT license: http://www.opensource.org/licenses/mit-license.php ]
+*/
+
 #include <bitset>
 #include "mbed.h"
 #include "SdUsbConnect.h"
@@ -5,38 +32,34 @@
 #include "tinypcl.hpp"
 #include "camera_if.hpp"
 
-// 筐体に依存するパラメーター
-#define CAMERA_DISTANCE 115     // 原点(ステッピングモーター回転軸)からカメラの距離(mm)
-#define CAMERA_OFFSET  3        // カメラ高さの調整(mm)
+// Extrinsic parameters of the camera (Depends on your enclosure design)
+#define CAMERA_DISTANCE 115     // Distance from the origin to the camera (mm)
+#define CAMERA_OFFSET  3        // Height offset of the camera relative to the origin (mm)
 
-// カメラ内部パラメーター（OpenCVのカメラキャリブレーションが必要）
-#define CAMERA_CENTER_U 321     // 画像中心(横方向)
-#define CAMERA_CENTER_V 244     // 画像中心（縦方向）
-#define CAMERA_FX 365.202395    // カメラ焦点距離(fx)
-#define CAMERA_FY 365.519979    // カメラ焦点距離(fy)
+// Intrinsic parameters of the camera (cf. OpenCV's Camera Calibration)
+#define CAMERA_CENTER_U 321     // Optical centers (cx)
+#define CAMERA_CENTER_V 244     // Optical centers (cy)
+#define CAMERA_FX 365.202395    // Focal length(fx)
+#define CAMERA_FY 365.519979    // Focal length(fy)
 
-// ステッピングモーターの出力ピン(ステッピングモータードライバとしてA4988を利用)
-DigitalOut a4988_step(D8);      // connect the pin to A4988 step
-DigitalOut a4988_dir(D9);       // connect the pin to A4988 dir
-
-// ボタンの入力ピン
-DigitalIn   button0(D4);        // connect the pin to button0
-DigitalIn   button1(D6);        // connect the pin to button1
-
-// 状態表示LEDの出力ピン
-DigitalOut  led_working(D7);    // 処理中
-DigitalOut  led_ready(D5);      // 背景画像取得完了
-DigitalOut  led1(LED1);         // デバッグ用（カメラが準備完了になった時にLED1を点灯）
-
-// Stepper Motor Parameters
-#define STEPPER_DIRECTION   1       // direction (0 or 1)
-#define STEPPER_WAIT        0.004   // pulse duration
-#define STEPPER_STEP_COUNTS 200     // a 200 step motor is the same as a 1.8 degrees motor 
+// Stepper Motor Parameters (Depends on your stepper motor)
+#define STEPPER_DIRECTION   1       // Direction (0 or 1)
+#define STEPPER_WAIT        0.004   // Pulse duration
+#define STEPPER_STEP_COUNTS 200     // A 200 step motor is the same as a 1.8 degrees motor 
 #define STEPPER_STEP_RESOLUTIONS 4  // full-step = 1, half-step = 2, quarter-step = 4
 
 // 復元関連のパラメーター
 #define SILHOUETTE_COUNTS           40  // 復元で利用する画像の枚数 
 #define SILHOUETTE_THRESH_BINARY    30  // 二値化する際のしきい値
+
+// Defines pins numbers (Depends on your circuit design)
+DigitalOut  a4988_step(D8);     // Connect the pin to A4988 step
+DigitalOut  a4988_dir(D9);      // Connect the pin to A4988 dir
+DigitalIn   button0(D4);        // Connect the pin to SW1
+DigitalIn   button1(D6);        // Connect the pin to SW2
+DigitalOut  led_ready(D5);      // Connect the pin to LED1 (ready)
+DigitalOut  led_working(D7);    // Connect the pin to LED2 (working)
+DigitalOut  led1(LED1);         // Use onboard LED for debugging purposes
 
 // 復元関連のデータ
 PointCloud point_cloud;      // 仮想物体（復元する点群）
@@ -71,16 +94,17 @@ int projection(double rad, double Xw, double Yw,double Zw, int &u, int &v)
 // 輪郭画像からの立体形状復元
 // 3d reconstruction from silhouette
 void reconst(double rad) {
-    // Takes a video frame in grayscale(see camera_if.cpp)
+    // Takes a video frame in grayscale (cf. camera_if.cpp)
     cv::Mat img_silhouette;
     create_gray(img_silhouette);
 
-    // 背景画像の除去と輪郭画像の取得
-    // Background subtraction and get silhouette
+    // Background subtraction
     cv::absdiff(img_silhouette, img_background, img_silhouette);
+
+    // Get a silhouette
     cv::threshold(img_silhouette, img_silhouette, SILHOUETTE_THRESH_BINARY, 255, cv::THRESH_BINARY);
 
-    // 輪郭画像の出力（デバッグ用）
+    // Saves a silhouette image for dubugging purposes
     // sprintf(file_name, "/storage/img_%d.bmp", file_name_index);
     // cv::imwrite(file_name, img_silhouette);
     // printf("Saved file %s\r\n", file_name);
@@ -125,7 +149,7 @@ void reconst(double rad) {
     }
 }
 
-// ステッピングモーターの回転(ステッピングモータードライバとしてA4988を利用)
+// Rotates a stepper motor with a A4988 stepper motor driver
 void rotate(int steps) {
     a4988_dir = STEPPER_DIRECTION;
     for (int i=0;i<steps;i++) {
@@ -137,14 +161,14 @@ void rotate(int steps) {
 }
 
 int main() {
-    // Camera
+    // Starts camera
     camera_start();
     led1 = 1;
 
-    // SD & USB
+    // Connects SD & USB
     SdUsbConnect storage("storage");
 
-    // Stepping motor
+    // Resets stepper motor
     a4988_dir = STEPPER_DIRECTION;
     a4988_step = 0;
 
@@ -152,11 +176,11 @@ int main() {
         storage.wait_connect();
 
         if (button0 == 0) {
-            // Takes a video frame in grayscale (see camera_if.cpp) and set as a background image
+            // Takes a video frame in grayscale and set as a background image
             led_working = 1;
             create_gray(img_background);
 
-            // 取得した背景画像の保存
+            // Saves a background image to a storage
             sprintf(file_name, "/storage/img_%d.jpg", file_name_index++);
             save_image_jpg(file_name); // save as jpeg
             printf("Saved file %s\r\n", file_name);
@@ -170,7 +194,7 @@ int main() {
             // Shape from silhouette アルゴリズムによる立体形状復元
             // テーブルを回転させながら輪郭画像の取得と立体形状復元を繰り返す
             for (int i = 0; i < SILHOUETTE_COUNTS; i++) {
-                // プレビュー画像の送信
+                // Send a preview image to PC
                 size_t jpeg_size = create_jpeg();
                 display_app.SendJpeg(get_jpeg_adr(), jpeg_size);
 
@@ -179,21 +203,21 @@ int main() {
                 double rad = (double)(2 * 3.14159265258979)*((double)i / SILHOUETTE_COUNTS);
                 reconst(rad);
 
-                // 取得した画像の保存
+                // Saves a preview image for dubugging purposes
                 sprintf(file_name, "/storage/img_%d.jpg", file_name_index++);
                 save_image_jpg(file_name); // save as jpeg
                 printf("Saved file %s\r\n", file_name);
 
                 led_working = 0;
 
-                // テーブルの回転
+                // Rotates the turn table
                 rotate(STEPPER_STEP_COUNTS * STEPPER_STEP_RESOLUTIONS / SILHOUETTE_COUNTS);
             }
 
-            // 復元した立体形状データの修正
+            // Clean the result
             point_cloud.remove_edge();
 
-            // 復元した立体形状データの出力
+            // Save the result
             cout << "writting..." << endl;
             led_working = 1;
 
@@ -211,6 +235,7 @@ int main() {
             point_cloud.clear();
         }
 
+        // Send a preview image to PC
         size_t jpeg_size = create_jpeg();
         display_app.SendJpeg(get_jpeg_adr(), jpeg_size);
     }
