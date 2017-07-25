@@ -1,5 +1,5 @@
 /*
-** tiny Point Cloud Library
+** DIY GR-LYCHEE/GR-PEACH 3D Scanner
 **
 ** Copyright (c) 2017 Jun Takeda
 **
@@ -25,7 +25,6 @@
 ** [ MIT license: http://www.opensource.org/licenses/mit-license.php ]
 */
 
-#include <bitset>
 #include "mbed.h"
 #include "SdUsbConnect.h"
 #include "DisplayApp.h"
@@ -42,15 +41,17 @@
 #define CAMERA_FX 365.202395    // Focal length(fx)
 #define CAMERA_FY 365.519979    // Focal length(fy)
 
-// Stepper Motor Parameters (Depends on your stepper motor)
+// 3D reconstruction Parameters
+#define SILHOUETTE_COUNTS           40  // number of silhouette 
+#define SILHOUETTE_THRESH_BINARY    30  // threshold value for silhouette detection
+
+// Stepper motor parameters (Depends on your stepper motor)
 #define STEPPER_DIRECTION   1       // Direction (0 or 1)
 #define STEPPER_WAIT        0.004   // Pulse duration
 #define STEPPER_STEP_COUNTS 200     // A 200 step motor is the same as a 1.8 degrees motor 
-#define STEPPER_STEP_RESOLUTIONS 4  // full-step = 1, half-step = 2, quarter-step = 4
 
-// 復元関連のパラメーター
-#define SILHOUETTE_COUNTS           40  // 復元で利用する画像の枚数 
-#define SILHOUETTE_THRESH_BINARY    30  // 二値化する際のしきい値
+// Stepper motor driver parameters (Depends on your circuit design)
+#define STEPPER_STEP_RESOLUTIONS 4  // full-step = 1, half-step = 2, quarter-step = 4
 
 // Defines pins numbers (Depends on your circuit design)
 DigitalOut  a4988_step(D8);     // Connect the pin to A4988 step
@@ -61,40 +62,38 @@ DigitalOut  led_ready(D5);      // Connect the pin to LED1 (ready)
 DigitalOut  led_working(D7);    // Connect the pin to LED2 (working)
 DigitalOut  led1(LED1);         // Use onboard LED for debugging purposes
 
-// 復元関連のデータ
-PointCloud point_cloud;      // 仮想物体（復元する点群）
-cv::Mat img_background;      // 背景画像
+// Global variable for 3D reconstruction
+PointCloud point_cloud;      // Point cloud (3D reconstruction result)
+cv::Mat img_background;      // Background image
 
-int reconst_count = 1;       // 復元結果ファイルのインデックス
-char file_name[32];          // 出力ファイル名
-int file_name_index = 1;     // 出力ファイル名のインデックス
+int reconst_index = 1;
+int file_name_index = 1;
+char file_name[32];
 
 /* For viewing image on PC */
 static DisplayApp  display_app;
 
-// 3次元座標から2次元座標への変換
+// Projects a 3D point into camera coordinates
 int projection(double rad, double Xw, double Yw,double Zw, int &u, int &v)
 {
-    // （仮想物体を）ワールド座標の原点を中心にY軸周りに回転
+    // Pitch rotations around the Y axis
     double Xc= cos(rad)*Xw + sin(rad)*Zw;
     double Yc= Yw;
     double Zc=-sin(rad)*Xw + cos(rad)*Zw;
 
-    // ワールド座標からカメラ座標への変換（Z軸方向の移動のみ）
+    // Perspective projection
     Yc+=CAMERA_OFFSET;
     Zc-=CAMERA_DISTANCE;
   
-    // 画像座標へ変換
     u= CAMERA_CENTER_U - (int)((Xc/Zc)*(CAMERA_FX));
     v= CAMERA_CENTER_V - (int)((Yc/Zc)*(CAMERA_FY));
 
     return (u>0 && u<VIDEO_PIXEL_HW && v>0 && v<VIDEO_PIXEL_VW);
 }
 
-// 輪郭画像からの立体形状復元
-// 3d reconstruction from silhouette
+// 3D reconstruction from silhouette
 void reconst(double rad) {
-    // Takes a video frame in grayscale (cf. camera_if.cpp)
+    // Take a video frame in grayscale (cf. camera_if.cpp)
     cv::Mat img_silhouette;
     create_gray(img_silhouette);
 
@@ -109,7 +108,7 @@ void reconst(double rad) {
     // cv::imwrite(file_name, img_silhouette);
     // printf("Saved file %s\r\n", file_name);
 
-    // 輪郭画像による仮想物体の型抜き - Shape from silhouette
+    // Voxel based "Shape from silhouette"
     // このプログラムでは、仮想物体の形状を点群(point cloud data)で表現している。
     // point_cloud_data(x,y,z) = 0の場合、そこには物体がないことを意味する。
     // point_cloud_data(x,y,z) = 1の場合、そこには物体がある（可能性がある）ことを意味する。
@@ -129,18 +128,18 @@ void reconst(double rad) {
             for (int x=0; x<point_cloud.POINTS; x++, xx += point_cloud.SCALE, pcd_index++) {
                 if (point_cloud.get(pcd_index) == 1) {
                     
-                    // 復元対象の点がカメラ画像内ではどこにあるかを計算する
+                    // Project a 3D point into camera coordinates
                     if (projection(rad, xx, yy, zz, u, v)) {
                         // カメラ画像内のため、輪郭画像と比較する
                         if (img_silhouette.at<unsigned char>(v, u)) {
-                            // 復元対象の点は、輪郭画像内（白色）のため、そのまま
+                            // Keep the point because it is inside the shilhouette
                         }
                         else {
-                            // 復元対象の点は、輪郭画像外（黒色）のため、除去
+                            // Delete the point because it is outside the shilhouette
                             point_cloud.set(pcd_index, 0);
                         }
                     } else {
-                        // カメラ画像外のためクリアする
+                        // Delete the point because it is outside the camera image
                         point_cloud.set(pcd_index, 0);
                     }
                 }
@@ -161,14 +160,14 @@ void rotate(int steps) {
 }
 
 int main() {
-    // Starts camera
+    // Start camera
     camera_start();
     led1 = 1;
 
-    // Connects SD & USB
+    // Connect SD & USB
     SdUsbConnect storage("storage");
 
-    // Resets stepper motor
+    // Reset stepper motor
     a4988_dir = STEPPER_DIRECTION;
     a4988_step = 0;
 
@@ -176,11 +175,11 @@ int main() {
         storage.wait_connect();
 
         if (button0 == 0) {
-            // Takes a video frame in grayscale and set as a background image
+            // Take a video frame in grayscale and set as a background image
             led_working = 1;
             create_gray(img_background);
 
-            // Saves a background image to a storage
+            // Save a background image to a storage
             sprintf(file_name, "/storage/img_%d.jpg", file_name_index++);
             save_image_jpg(file_name); // save as jpeg
             printf("Saved file %s\r\n", file_name);
@@ -198,19 +197,19 @@ int main() {
                 size_t jpeg_size = create_jpeg();
                 display_app.SendJpeg(get_jpeg_adr(), jpeg_size);
 
-                // 輪郭画像の取得と立体形状復元
+                // 3D reconstruction
                 led_working = 1;
                 double rad = (double)(2 * 3.14159265258979)*((double)i / SILHOUETTE_COUNTS);
                 reconst(rad);
 
-                // Saves a preview image for dubugging purposes
+                // Save a preview image for dubugging purposes
                 sprintf(file_name, "/storage/img_%d.jpg", file_name_index++);
                 save_image_jpg(file_name); // save as jpeg
                 printf("Saved file %s\r\n", file_name);
 
                 led_working = 0;
 
-                // Rotates the turn table
+                // Rotate the turn table
                 rotate(STEPPER_STEP_COUNTS * STEPPER_STEP_RESOLUTIONS / SILHOUETTE_COUNTS);
             }
 
@@ -221,14 +220,14 @@ int main() {
             cout << "writting..." << endl;
             led_working = 1;
 
-            sprintf(file_name, "/storage/result_%d.xyz", reconst_count);
+            sprintf(file_name, "/storage/result_%d.xyz", reconst_index);
             point_cloud.save_as_xyz(file_name);
-            sprintf(file_name, "/storage/result_%d.stl", reconst_count);
+            sprintf(file_name, "/storage/result_%d.stl", reconst_index);
             point_cloud.save_as_stl(file_name);
-            // sprintf(file_name, "/storage/result_%d.ply", reconst_count);
+            // sprintf(file_name, "/storage/result_%d.ply", reconst_index);
             // point_cloud.save_as_ply(file_name);
 
-            reconst_count++;
+            reconst_index++;
 
             led_working = 0;
             cout << "finish" << endl;
