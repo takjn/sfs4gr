@@ -48,7 +48,7 @@ public:
     void set(unsigned int index, unsigned char val);
     void set(unsigned int x, unsigned int y, unsigned int z, unsigned char val);
     void clear();
-    void remove_edge();
+    void remove_noise();
     void save_as_stl(const char*);
     void save_as_ply(const char*);
     void save_as_xyz(const char*);

@@ -29,29 +29,32 @@
 #include <stdio.h>
 #include "tinypcl.hpp"
 
+// Constructor: Initializes PointCloud
 PointCloud::PointCloud(void) {
     clear();
 }
 
-// 指定された点の値の読み取り
+// Returns the value of the point
 unsigned char PointCloud::get(unsigned int index) {
     return point_cloud_data[index];
 }
 
+// Returns the value of the point
 unsigned char PointCloud::get(unsigned int x, unsigned int y, unsigned int z) {
     return point_cloud_data(x,y,z);
 }
 
-// 指定された点に値を設定
+// Sets the value of the point
 void PointCloud::set(unsigned int index, unsigned char val) {
     point_cloud_data[index] = val;
 }
 
+// Sets the value of the point
 void PointCloud::set(unsigned int x, unsigned int y, unsigned int z, unsigned char val) {
     point_cloud_data(x,y,z) = val;
 }
 
-// 点群データの初期化
+// Clear all points
 void PointCloud::clear(void) {
     for (int z=0;z<POINTS;z++) {
         for (int y=0;y<POINTS;y++) {
@@ -62,11 +65,11 @@ void PointCloud::clear(void) {
     }
 }
 
-// 外周部のデータの削除（メッシュ化に必要）
-void PointCloud::remove_edge(void) {
+// Remove noise
+void PointCloud::remove_noise(void) {
     for (int i=0; i<POINTS; i++) {
         for (int j=0; j<POINTS; j++) {
-            // 外周部は除去
+            // Remove surface points for better meshing
             point_cloud_data(i,j,0) = 0;
             point_cloud_data(i,0,j) = 0;
             point_cloud_data(0,i,j) = 0;
@@ -75,13 +78,36 @@ void PointCloud::remove_edge(void) {
             point_cloud_data(POINTS-1,i,j) = 0;
         }
     }
+
+    // Remove isolated points
+    for (int z=1; z<POINTS-1; z++) {
+        for (int y=1; y<POINTS-1; y++) {
+            for (int x=1; x<POINTS-1; x++) {
+                if (point_cloud_data(x,y,z) == 1) {
+
+                    int count = 0;
+                    for (int i=-1;i<2;i++) {
+                        for (int j=-1;j<2;j++) {
+                            for (int k=-1;k<2;k++) {
+                                if (point_cloud_data((x+i),(y+j),(z+k)) == 0) count++;
+                            }
+                        }
+                    }
+
+                    if (count>24) {
+                        point_cloud_data(x,y,z) = 0;
+                    }
+                }
+            }
+        }
+    }
 }
 
-// 点群データをメッシュ化してplyファイルとして保存
+// Save point clouds as PLY file with surface reconstruction
 void PointCloud::save_as_ply(const char* file_name) {
     FILE *fp_ply = fopen(file_name, "w");
 
-    // 先に面の数を数えておく
+    // Count the number of faces
     int x,y,z;
     int face_count=0;
     for (z=1; z<POINTS-1; z++) {
@@ -99,7 +125,7 @@ void PointCloud::save_as_ply(const char* file_name) {
         }
     }
 
-	// write PLY file header
+	// Write PLY file header
     fprintf(fp_ply,"ply\n");
     fprintf(fp_ply,"format ascii 1.0\n");
     fprintf(fp_ply,"element vertex %d\n", face_count*4);
@@ -113,7 +139,7 @@ void PointCloud::save_as_ply(const char* file_name) {
     fprintf(fp_ply,"property list uint8 int32 vertex_indices\n");
     fprintf(fp_ply,"end_header\n");
 
-    // Vertexの出力
+    // Write vertex
     for (z=1; z<POINTS-1; z++) {
         for (y=1; y<POINTS-1; y++) {
             for (x=1; x<POINTS-1; x++) {
@@ -165,6 +191,7 @@ void PointCloud::save_as_ply(const char* file_name) {
         }
     }
 
+    // Write face
     for (int i=0;i<face_count;i++) {
         int idx = i*4;
         fprintf(fp_ply,"4 %d %d %d %d\n", idx, idx+1, idx+2, idx+3);
@@ -173,19 +200,19 @@ void PointCloud::save_as_ply(const char* file_name) {
 	fclose(fp_ply);
 }
 
-// 点群データをメッシュ化してSTLファイルとして保存
+// Save point clouds as STL file with surface reconstruction
 void PointCloud::save_as_stl(const char* file_name) {
     FILE *fp_stl = fopen(file_name, "w");
 
-    // write STL file header
+    // Write STL file header
     fprintf(fp_stl,"solid result-ascii\n");
     
+    // Write normal and vertex
     for (int z=1; z<POINTS-1; z++) {
         for (int y=1; y<POINTS-1; y++) {
             for (int x=1; x<POINTS-1; x++) {
                 if (point_cloud_data(x,y,z) == 1) {
 
-                    // STLファイルの出力
                     if (point_cloud_data(x,y,z+1) == 0) {
                         fprintf(fp_stl,"facet normal 0 0 1\n");
                         fprintf(fp_stl,"outer loop\n");
@@ -291,12 +318,12 @@ void PointCloud::save_as_stl(const char* file_name) {
             }
         }
     }
-    // write STL file footer
+    // Write STL file footer
     fprintf(fp_stl,"endsolid\n");
     fclose(fp_stl);
 }
 
-// 点群データをXYZファイルとして保存
+// Save point clouds as XYZ file
 void PointCloud::save_as_xyz(const char* file_name) {
     FILE *fp_xyz = fopen(file_name, "w");
 
@@ -305,7 +332,7 @@ void PointCloud::save_as_xyz(const char* file_name) {
             for (int x=1; x<POINTS-1; x++) {
                 if (point_cloud_data(x,y,z) == 1) {
 
-                    // 物体内部の点は出力しない
+                    // Save surface points  only
                     int count = 0;
                     for (int i=-1;i<2;i++) {
                         for (int j=-1;j<2;j++) {
@@ -316,7 +343,7 @@ void PointCloud::save_as_xyz(const char* file_name) {
                     }
 
                     if (count>4) {
-                        // 点群データ(Point Cloud Data)の出力
+                        // Write a 3D point
                         fprintf(fp_xyz,"%f -%f %f\n", x*SCALE, y*SCALE, z*SCALE);
                     }
                 }

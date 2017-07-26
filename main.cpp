@@ -213,8 +213,8 @@ int main() {
                 rotate(STEPPER_STEP_COUNTS * STEPPER_STEP_RESOLUTIONS / SILHOUETTE_COUNTS);
             }
 
-            // Clean the result
-            point_cloud.remove_edge();
+            // Remove noise
+            point_cloud.remove_noise();
 
             // Save the result
             cout << "writting..." << endl;
