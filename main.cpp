@@ -42,7 +42,7 @@
 #define CAMERA_FY 365.519979    // Focal length(fy)
 
 // 3D reconstruction Parameters
-#define SILHOUETTE_COUNTS           40  // number of silhouette 
+#define SILHOUETTE_COUNTS           40  // number of silhouette to use
 #define SILHOUETTE_THRESH_BINARY    30  // threshold value for silhouette detection
 
 // Stepper motor parameters (Depends on your stepper motor)
@@ -91,8 +91,9 @@ int projection(double rad, double Xw, double Yw,double Zw, int &u, int &v)
     return (u>0 && u<VIDEO_PIXEL_HW && v>0 && v<VIDEO_PIXEL_VW);
 }
 
-// 3D reconstruction from silhouette
-void reconst(double rad) {
+// Voxel based "Shape from silhouette"
+// Only voxels that lie inside all silhouette volumes remain part of the final shape.
+void shape_from_silhouette(double rad) {
     // Take a video frame in grayscale (cf. camera_if.cpp)
     cv::Mat img_silhouette;
     create_gray(img_silhouette);
@@ -108,15 +109,10 @@ void reconst(double rad) {
     // cv::imwrite(file_name, img_silhouette);
     // printf("Saved file %s\r\n", file_name);
 
-    // Voxel based "Shape from silhouette"
-    // このプログラムでは、仮想物体の形状を点群(point cloud data)で表現している。
-    // point_cloud_data(x,y,z) = 0の場合、そこには物体がないことを意味する。
-    // point_cloud_data(x,y,z) = 1の場合、そこには物体がある（可能性がある）ことを意味する。
-    // 型抜きとは、仮想物体の復元対象点ごとに、輪郭画像内外を判定し、輪郭画像外であれば除去、輪郭画像内であれば保持を繰り返すこと。
-    // このプログラムでは、原点を中心にxyzそれぞれ-50mm ~ +50mmの範囲を1mm単位で復元する。
-    double xx,yy,zz;    // 復元対象の点の座標値(x,y,z)
-    int u,v;            // 復元対象の点の、カメラ画像内での座標値(x,y)
-    int pcd_index=0;    // 仮想物体の復元対象点
+    // Check each voxels
+    double xx,yy,zz;    // 3D point(x,y,z)
+    int u,v;            // camera coordinates(x,y)
+    int pcd_index=0;
 
     zz = (-point_cloud.SIZE / 2) * point_cloud.SCALE;
     for (int z=0; z<point_cloud.SIZE; z++, zz += point_cloud.SCALE) {
@@ -130,7 +126,6 @@ void reconst(double rad) {
                     
                     // Project a 3D point into camera coordinates
                     if (projection(rad, xx, yy, zz, u, v)) {
-                        // カメラ画像内のため、輪郭画像と比較する
                         if (img_silhouette.at<unsigned char>(v, u)) {
                             // Keep the point because it is inside the shilhouette
                         }
@@ -190,17 +185,17 @@ int main() {
             wait_ms(100);
         }
         if (button1 == 0 && !img_background.empty()) {
-            // Shape from silhouette アルゴリズムによる立体形状復元
-            // テーブルを回転させながら輪郭画像の取得と立体形状復元を繰り返す
+            // Scan 3D object with camera
+            // Repeat taking a image and 3D reconstruction while rotating the turntable.
             for (int i = 0; i < SILHOUETTE_COUNTS; i++) {
                 // Send a preview image to PC
                 size_t jpeg_size = create_jpeg();
                 display_app.SendJpeg(get_jpeg_adr(), jpeg_size);
 
-                // 3D reconstruction
+                // Shape from silhouette
                 led_working = 1;
                 double rad = (double)(2 * 3.14159265258979)*((double)i / SILHOUETTE_COUNTS);
-                reconst(rad);
+                shape_from_silhouette(rad);
 
                 // Save a preview image for dubugging purposes
                 sprintf(file_name, "/storage/img_%d.jpg", file_name_index++);
@@ -209,12 +204,12 @@ int main() {
 
                 led_working = 0;
 
-                // Rotate the turn table
+                // Rotate the turntable
                 rotate(STEPPER_STEP_COUNTS * STEPPER_STEP_RESOLUTIONS / SILHOUETTE_COUNTS);
             }
 
-            // Remove noise
-            point_cloud.remove_noise();
+            // Finalize the result
+            point_cloud.finalize();
 
             // Save the result
             cout << "writting..." << endl;

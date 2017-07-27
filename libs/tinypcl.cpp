@@ -65,8 +65,8 @@ void PointCloud::clear(void) {
     }
 }
 
-// Remove noise
-void PointCloud::remove_noise(void) {
+// Finalize point clouds
+void PointCloud::finalize(void) {
     // Invert Y axis
     for (int z=0; z<SIZE; z++) {
         for (int y=0; y<SIZE/2; y++) {

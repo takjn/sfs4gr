@@ -49,12 +49,12 @@ public:
     void set(unsigned int index, unsigned char val);
     void set(unsigned int x, unsigned int y, unsigned int z, unsigned char val);
     void clear();
-    void remove_noise();
+    void finalize();
     void save_as_stl(const char*);
     void save_as_ply(const char*);
     void save_as_xyz(const char*);
 private:
-    // 3D grid
+    // 3D grid representing object space
     bitset<PCD_SIZE*PCD_SIZE*PCD_SIZE> point_cloud_data;
 };
 
