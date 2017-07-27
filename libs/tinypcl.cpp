@@ -67,9 +67,20 @@ void PointCloud::clear(void) {
 
 // Remove noise
 void PointCloud::remove_noise(void) {
+    // Invert Y axis
+    for (int z=0; z<POINTS; z++) {
+        for (int y=0; y<POINTS/2; y++) {
+            for (int x=0; x<POINTS; x++) {
+                char val = point_cloud_data(x, y, z);
+                point_cloud_data(x, y, z) = point_cloud_data(x, (POINTS-y), z);
+                point_cloud_data(x, (POINTS-y), z) = val;
+            }
+        }
+    }
+
+    // Remove surface points for better meshing
     for (int i=0; i<POINTS; i++) {
         for (int j=0; j<POINTS; j++) {
-            // Remove surface points for better meshing
             point_cloud_data(i,j,0) = 0;
             point_cloud_data(i,0,j) = 0;
             point_cloud_data(0,i,j) = 0;
@@ -344,7 +355,7 @@ void PointCloud::save_as_xyz(const char* file_name) {
 
                     if (count>4) {
                         // Write a 3D point
-                        fprintf(fp_xyz,"%f -%f %f\n", x*SCALE, y*SCALE, z*SCALE);
+                        fprintf(fp_xyz,"%f %f %f\n", x*SCALE, y*SCALE, z*SCALE);
                     }
                 }
             }
