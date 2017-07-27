@@ -118,14 +118,14 @@ void reconst(double rad) {
     int u,v;            // 復元対象の点の、カメラ画像内での座標値(x,y)
     int pcd_index=0;    // 仮想物体の復元対象点
 
-    zz = (-point_cloud.POINTS / 2) * point_cloud.SCALE;
-    for (int z=0; z<point_cloud.POINTS; z++, zz += point_cloud.SCALE) {
+    zz = (-point_cloud.SIZE / 2) * point_cloud.SCALE;
+    for (int z=0; z<point_cloud.SIZE; z++, zz += point_cloud.SCALE) {
 
-        yy = (-point_cloud.POINTS / 2) * point_cloud.SCALE;
-        for (int y=0; y<point_cloud.POINTS; y++, yy += point_cloud.SCALE) {
+        yy = (-point_cloud.SIZE / 2) * point_cloud.SCALE;
+        for (int y=0; y<point_cloud.SIZE; y++, yy += point_cloud.SCALE) {
 
-            xx = (-point_cloud.POINTS / 2) * point_cloud.SCALE;
-            for (int x=0; x<point_cloud.POINTS; x++, xx += point_cloud.SCALE, pcd_index++) {
+            xx = (-point_cloud.SIZE / 2) * point_cloud.SCALE;
+            for (int x=0; x<point_cloud.SIZE; x++, xx += point_cloud.SCALE, pcd_index++) {
                 if (point_cloud.get(pcd_index) == 1) {
                     
                     // Project a 3D point into camera coordinates

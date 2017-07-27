@@ -56,9 +56,9 @@ void PointCloud::set(unsigned int x, unsigned int y, unsigned int z, unsigned ch
 
 // Clear all points
 void PointCloud::clear(void) {
-    for (int z=0;z<POINTS;z++) {
-        for (int y=0;y<POINTS;y++) {
-            for (int x=0;x<POINTS;x++) {
+    for (int z=0;z<SIZE;z++) {
+        for (int y=0;y<SIZE;y++) {
+            for (int x=0;x<SIZE;x++) {
                 point_cloud_data(x,y,z) = 1;
             }
         }
@@ -68,32 +68,32 @@ void PointCloud::clear(void) {
 // Remove noise
 void PointCloud::remove_noise(void) {
     // Invert Y axis
-    for (int z=0; z<POINTS; z++) {
-        for (int y=0; y<POINTS/2; y++) {
-            for (int x=0; x<POINTS; x++) {
+    for (int z=0; z<SIZE; z++) {
+        for (int y=0; y<SIZE/2; y++) {
+            for (int x=0; x<SIZE; x++) {
                 char val = point_cloud_data(x, y, z);
-                point_cloud_data(x, y, z) = point_cloud_data(x, (POINTS-y), z);
-                point_cloud_data(x, (POINTS-y), z) = val;
+                point_cloud_data(x, y, z) = point_cloud_data(x, (SIZE-y), z);
+                point_cloud_data(x, (SIZE-y), z) = val;
             }
         }
     }
 
     // Remove surface points for better meshing
-    for (int i=0; i<POINTS; i++) {
-        for (int j=0; j<POINTS; j++) {
+    for (int i=0; i<SIZE; i++) {
+        for (int j=0; j<SIZE; j++) {
             point_cloud_data(i,j,0) = 0;
             point_cloud_data(i,0,j) = 0;
             point_cloud_data(0,i,j) = 0;
-            point_cloud_data(i,j,POINTS-1) = 0;
-            point_cloud_data(i,POINTS-1,j) = 0;
-            point_cloud_data(POINTS-1,i,j) = 0;
+            point_cloud_data(i,j,SIZE-1) = 0;
+            point_cloud_data(i,SIZE-1,j) = 0;
+            point_cloud_data(SIZE-1,i,j) = 0;
         }
     }
 
     // Remove isolated points
-    for (int z=1; z<POINTS-1; z++) {
-        for (int y=1; y<POINTS-1; y++) {
-            for (int x=1; x<POINTS-1; x++) {
+    for (int z=1; z<SIZE-1; z++) {
+        for (int y=1; y<SIZE-1; y++) {
+            for (int x=1; x<SIZE-1; x++) {
                 if (point_cloud_data(x,y,z) == 1) {
 
                     int count = 0;
@@ -121,9 +121,9 @@ void PointCloud::save_as_ply(const char* file_name) {
     // Count the number of faces
     int x,y,z;
     int face_count=0;
-    for (z=1; z<POINTS-1; z++) {
-        for (y=1; y<POINTS-1; y++) {
-            for (x=1; x<POINTS-1; x++) {
+    for (z=1; z<SIZE-1; z++) {
+        for (y=1; y<SIZE-1; y++) {
+            for (x=1; x<SIZE-1; x++) {
                 if (point_cloud_data(x,y,z) == 1) {
                     if (point_cloud_data(x,y,z+1) == 0) face_count++;
                     if (point_cloud_data(x+1,y,z) == 0) face_count++;
@@ -151,9 +151,9 @@ void PointCloud::save_as_ply(const char* file_name) {
     fprintf(fp_ply,"end_header\n");
 
     // Write vertex
-    for (z=1; z<POINTS-1; z++) {
-        for (y=1; y<POINTS-1; y++) {
-            for (x=1; x<POINTS-1; x++) {
+    for (z=1; z<SIZE-1; z++) {
+        for (y=1; y<SIZE-1; y++) {
+            for (x=1; x<SIZE-1; x++) {
                 if (point_cloud_data(x,y,z) == 1) {
 
                     if (point_cloud_data(x,y,z-1) == 0) {
@@ -219,9 +219,9 @@ void PointCloud::save_as_stl(const char* file_name) {
     fprintf(fp_stl,"solid result-ascii\n");
     
     // Write normal and vertex
-    for (int z=1; z<POINTS-1; z++) {
-        for (int y=1; y<POINTS-1; y++) {
-            for (int x=1; x<POINTS-1; x++) {
+    for (int z=1; z<SIZE-1; z++) {
+        for (int y=1; y<SIZE-1; y++) {
+            for (int x=1; x<SIZE-1; x++) {
                 if (point_cloud_data(x,y,z) == 1) {
 
                     if (point_cloud_data(x,y,z+1) == 0) {
@@ -338,9 +338,9 @@ void PointCloud::save_as_stl(const char* file_name) {
 void PointCloud::save_as_xyz(const char* file_name) {
     FILE *fp_xyz = fopen(file_name, "w");
 
-    for (int z=1; z<POINTS-1; z++) {
-        for (int y=1; y<POINTS-1; y++) {
-            for (int x=1; x<POINTS-1; x++) {
+    for (int z=1; z<SIZE-1; z++) {
+        for (int y=1; y<SIZE-1; y++) {
+            for (int x=1; x<SIZE-1; x++) {
                 if (point_cloud_data(x,y,z) == 1) {
 
                     // Save surface points  only

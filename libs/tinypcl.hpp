@@ -30,15 +30,16 @@
 #include <bitset>
 using std::bitset;
 
-// 扱う空間の大きさ
-#define PCD_POINTS 100  // 点群の数
-#define PCD_SCALE 1.0   // 点群の間隔(mm)
+//  3D grid size
+#define PCD_SIZE 100    // size
+#define PCD_SCALE 1.0   // resolution(mm/grid)
 
-#define point_cloud_data(x,y,z)  point_cloud_data[(x) + ((y)*PCD_POINTS) + (PCD_POINTS*PCD_POINTS*(z))]
+// Syntax sugar to access voxels
+#define point_cloud_data(x,y,z)  point_cloud_data[(x) + ((y)*PCD_SIZE) + (PCD_SIZE*PCD_SIZE*(z))]
 
 class PointCloud {
 public:
-    const static int POINTS = PCD_POINTS;
+    const static int SIZE = PCD_SIZE;
     const static float SCALE = PCD_SCALE;
 
     PointCloud(void);
@@ -53,8 +54,8 @@ public:
     void save_as_ply(const char*);
     void save_as_xyz(const char*);
 private:
-    // 仮想物体（点群）
-    bitset<PCD_POINTS*PCD_POINTS*PCD_POINTS> point_cloud_data;
+    // 3D grid
+    bitset<PCD_SIZE*PCD_SIZE*PCD_SIZE> point_cloud_data;
 };
 
 #endif
