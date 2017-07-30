@@ -208,19 +208,19 @@ int main() {
                 rotate(STEPPER_STEP_COUNTS * STEPPER_STEP_RESOLUTIONS / SILHOUETTE_COUNTS);
             }
 
-            // Finalize the result
-            point_cloud.finalize();
-
             // Save the result
             cout << "writting..." << endl;
             led_working = 1;
 
+            // Finalize the result
+            point_cloud.finalize();
+
             sprintf(file_name, "/storage/result_%d.xyz", reconst_index);
             point_cloud.save_as_xyz(file_name);
-            sprintf(file_name, "/storage/result_%d.stl", reconst_index);
-            point_cloud.save_as_stl(file_name);
-            // sprintf(file_name, "/storage/result_%d.ply", reconst_index);
-            // point_cloud.save_as_ply(file_name);
+            // sprintf(file_name, "/storage/result_%d.stl", reconst_index);
+            // point_cloud.save_as_stl(file_name);
+            sprintf(file_name, "/storage/result_%d.ply", reconst_index);
+            point_cloud.save_as_ply(file_name);
 
             reconst_index++;
 

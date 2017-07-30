@@ -118,20 +118,57 @@ void PointCloud::finalize(void) {
 void PointCloud::save_as_ply(const char* file_name) {
     FILE *fp_ply = fopen(file_name, "w");
 
+    TRIANGLE triangles[5];
+    GRIDCELL grid;
+
     // Count the number of faces
     int x,y,z;
     int face_count=0;
-    for (z=1; z<SIZE-1; z++) {
-        for (y=1; y<SIZE-1; y++) {
-            for (x=1; x<SIZE-1; x++) {
-                if (point_cloud_data(x,y,z) == 1) {
-                    if (point_cloud_data(x,y,z+1) == 0) face_count++;
-                    if (point_cloud_data(x+1,y,z) == 0) face_count++;
-                    if (point_cloud_data(x,y,z-1) == 0) face_count++;
-                    if (point_cloud_data(x-1,y,z) == 0) face_count++;
-                    if (point_cloud_data(x,y+1,z) == 0) face_count++;
-                    if (point_cloud_data(x,y-1,z) == 0) face_count++;
-                }
+    for (z=0; z<SIZE-1; z++) {
+        for (y=0; y<SIZE-1; y++) {
+            for (x=0; x<SIZE-1; x++) {
+                grid.p[0].x = x; 
+                grid.p[0].y = y; 
+                grid.p[0].z = z;
+                grid.val[0] = point_cloud_data(x, y, z);
+
+                grid.p[1].x = x+1;
+                grid.p[1].y = y;
+                grid.p[1].z = z;
+                grid.val[1] = point_cloud_data(x+1, y, z);
+
+                grid.p[2].x = x+1;
+                grid.p[2].y = y+1;
+                grid.p[2].z = z;
+                grid.val[2] = point_cloud_data(x+1, y+1, z);
+
+                grid.p[3].x = x;
+                grid.p[3].y = y+1;
+                grid.p[3].z = z;
+                grid.val[3] = point_cloud_data(x, y+1, z);
+
+                grid.p[4].x = x;
+                grid.p[4].y = y;
+                grid.p[4].z = z+1;
+                grid.val[4] = point_cloud_data(x, y, z+1);
+
+                grid.p[5].x = x+1;
+                grid.p[5].y = y;
+                grid.p[5].z = z+1;
+                grid.val[5] = point_cloud_data(x+1, y, z+1);
+
+                grid.p[6].x = x+1;
+                grid.p[6].y = y+1;
+                grid.p[6].z = z+1;
+                grid.val[6] = point_cloud_data(x+1, y+1, z+1);
+                
+                grid.p[7].x = x;
+                grid.p[7].y = y+1;
+                grid.p[7].z = z+1;
+                grid.val[7] = point_cloud_data(x, y+1, z+1);
+
+                int ret = Polygonise(grid, 1, triangles);
+                face_count += ret;
             }
         }
     }
@@ -139,63 +176,63 @@ void PointCloud::save_as_ply(const char* file_name) {
 	// Write PLY file header
     fprintf(fp_ply,"ply\n");
     fprintf(fp_ply,"format ascii 1.0\n");
-    fprintf(fp_ply,"element vertex %d\n", face_count*4);
+    fprintf(fp_ply,"element vertex %d\n", face_count*3);
     fprintf(fp_ply,"property float x\n");
     fprintf(fp_ply,"property float y\n");
     fprintf(fp_ply,"property float z\n");
-    fprintf(fp_ply,"property uchar red\n");
-    fprintf(fp_ply,"property uchar green\n");
-    fprintf(fp_ply,"property uchar blue\n");
     fprintf(fp_ply,"element face %d\n", face_count);
     fprintf(fp_ply,"property list uint8 int32 vertex_indices\n");
     fprintf(fp_ply,"end_header\n");
 
     // Write vertex
-    for (z=1; z<SIZE-1; z++) {
-        for (y=1; y<SIZE-1; y++) {
-            for (x=1; x<SIZE-1; x++) {
-                if (point_cloud_data(x,y,z) == 1) {
+    for (z=0; z<SIZE-1; z++) {
+        for (y=0; y<SIZE-1; y++) {
+            for (x=0; x<SIZE-1; x++) {
+                grid.p[0].x = x; 
+                grid.p[0].y = y; 
+                grid.p[0].z = z;
+                grid.val[0] = point_cloud_data(x, y, z);
 
-                    if (point_cloud_data(x,y,z-1) == 0) {
-                        fprintf(fp_ply,"%f %f %f 200 200 200\n", x    *SCALE, y    *SCALE, z    *SCALE);
-                        fprintf(fp_ply,"%f %f %f 200 200 200\n", x    *SCALE, (y+1)*SCALE, z    *SCALE);
-                        fprintf(fp_ply,"%f %f %f 200 200 200\n", (x+1)*SCALE, (y+1)*SCALE, z    *SCALE);
-                        fprintf(fp_ply,"%f %f %f 200 200 200\n", (x+1)*SCALE, y    *SCALE, z    *SCALE);
-                    }
+                grid.p[1].x = x+1;
+                grid.p[1].y = y;
+                grid.p[1].z = z;
+                grid.val[1] = point_cloud_data(x+1, y, z);
 
-                    if (point_cloud_data(x,y,z+1) == 0) {
-                        fprintf(fp_ply,"%f %f %f 200 200 200\n", x    *SCALE, y    *SCALE, (z+1)*SCALE);
-                        fprintf(fp_ply,"%f %f %f 200 200 200\n", (x+1)*SCALE, y    *SCALE, (z+1)*SCALE);
-                        fprintf(fp_ply,"%f %f %f 200 200 200\n", (x+1)*SCALE, (y+1)*SCALE, (z+1)*SCALE);
-                        fprintf(fp_ply,"%f %f %f 200 200 200\n", x    *SCALE, (y+1)*SCALE, (z+1)*SCALE);
-                    }
+                grid.p[2].x = x+1;
+                grid.p[2].y = y+1;
+                grid.p[2].z = z;
+                grid.val[2] = point_cloud_data(x+1, y+1, z);
 
-                    if (point_cloud_data(x-1,y,z) == 0) {
-                        fprintf(fp_ply,"%f %f %f 200 200 200\n", x    *SCALE, y    *SCALE, z    *SCALE);
-                        fprintf(fp_ply,"%f %f %f 200 200 200\n", x    *SCALE, y    *SCALE, (z+1)*SCALE);
-                        fprintf(fp_ply,"%f %f %f 200 200 200\n", x    *SCALE, (y+1)*SCALE, (z+1)*SCALE);
-                        fprintf(fp_ply,"%f %f %f 200 200 200\n", x    *SCALE, (y+1)*SCALE, z    *SCALE);
-                    }
+                grid.p[3].x = x;
+                grid.p[3].y = y+1;
+                grid.p[3].z = z;
+                grid.val[3] = point_cloud_data(x, y+1, z);
 
-                    if (point_cloud_data(x+1,y,z) == 0) {
-                        fprintf(fp_ply,"%f %f %f 200 200 200\n", (x+1)*SCALE, y    *SCALE, z    *SCALE);
-                        fprintf(fp_ply,"%f %f %f 200 200 200\n", (x+1)*SCALE, (y+1)*SCALE, z    *SCALE);
-                        fprintf(fp_ply,"%f %f %f 200 200 200\n", (x+1)*SCALE, (y+1)*SCALE, (z+1)*SCALE);
-                        fprintf(fp_ply,"%f %f %f 200 200 200\n", (x+1)*SCALE, y    *SCALE, (z+1)*SCALE);
-                    }
+                grid.p[4].x = x;
+                grid.p[4].y = y;
+                grid.p[4].z = z+1;
+                grid.val[4] = point_cloud_data(x, y, z+1);
 
-                    if (point_cloud_data(x,y-1,z) == 0) {
-                        fprintf(fp_ply,"%f %f %f 200 200 200\n", x    *SCALE, y    *SCALE, z    *SCALE);
-                        fprintf(fp_ply,"%f %f %f 200 200 200\n", (x+1)*SCALE, y    *SCALE, z    *SCALE);
-                        fprintf(fp_ply,"%f %f %f 200 200 200\n", (x+1)*SCALE, y    *SCALE, (z+1)*SCALE);
-                        fprintf(fp_ply,"%f %f %f 200 200 200\n", x    *SCALE, y    *SCALE, (z+1)*SCALE);
-                    }
+                grid.p[5].x = x+1;
+                grid.p[5].y = y;
+                grid.p[5].z = z+1;
+                grid.val[5] = point_cloud_data(x+1, y, z+1);
 
-                    if (point_cloud_data(x,y+1,z) == 0) {
-                        fprintf(fp_ply,"%f %f %f 200 200 200\n", x    *SCALE, (y+1)*SCALE, z    *SCALE);
-                        fprintf(fp_ply,"%f %f %f 200 200 200\n", x    *SCALE, (y+1)*SCALE, (z+1)*SCALE);
-                        fprintf(fp_ply,"%f %f %f 200 200 200\n", (x+1)*SCALE, (y+1)*SCALE, (z+1)*SCALE);
-                        fprintf(fp_ply,"%f %f %f 200 200 200\n", (x+1)*SCALE, (y+1)*SCALE, z    *SCALE);
+                grid.p[6].x = x+1;
+                grid.p[6].y = y+1;
+                grid.p[6].z = z+1;
+                grid.val[6] = point_cloud_data(x+1, y+1, z+1);
+                
+                grid.p[7].x = x;
+                grid.p[7].y = y+1;
+                grid.p[7].z = z+1;
+                grid.val[7] = point_cloud_data(x, y+1, z+1);
+
+                int ret = Polygonise(grid, 1, triangles);
+                for (int i=0; i<ret; i++) {
+                    for (int j=0;j<3;j++) {
+                        //triangles
+                        fprintf(fp_ply,"%g %g %g\n", triangles[i].p[j].x*SCALE, triangles[i].p[j].y*SCALE, triangles[i].p[j].z*SCALE);
                     }
                 }
             }
@@ -204,8 +241,8 @@ void PointCloud::save_as_ply(const char* file_name) {
 
     // Write face
     for (int i=0;i<face_count;i++) {
-        int idx = i*4;
-        fprintf(fp_ply,"4 %d %d %d %d\n", idx, idx+1, idx+2, idx+3);
+        int idx = i*3;
+        fprintf(fp_ply,"3 %d %d %d\n", idx, idx+1, idx+2);
     }
 
 	fclose(fp_ply);

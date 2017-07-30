@@ -27,6 +27,7 @@
 #ifndef TINYPCL_HPP
 #define TINYPCL_HPP
 
+#include "marchingcubes.hpp"
 #include <bitset>
 using std::bitset;
 
