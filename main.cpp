@@ -217,10 +217,10 @@ int main() {
 
             sprintf(file_name, "/storage/result_%d.xyz", reconst_index);
             point_cloud.save_as_xyz(file_name);
-            // sprintf(file_name, "/storage/result_%d.stl", reconst_index);
-            // point_cloud.save_as_stl(file_name);
-            sprintf(file_name, "/storage/result_%d.ply", reconst_index);
-            point_cloud.save_as_ply(file_name);
+            sprintf(file_name, "/storage/result_%d.stl", reconst_index);
+            point_cloud.save_as_stl(file_name);
+            // sprintf(file_name, "/storage/result_%d.ply", reconst_index);
+            // point_cloud.save_as_ply(file_name);
 
             reconst_index++;
 

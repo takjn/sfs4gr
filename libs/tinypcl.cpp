@@ -27,6 +27,7 @@
 
 #include <bitset>
 #include <stdio.h>
+#include <math.h>
 #include "tinypcl.hpp"
 
 // Constructor: Initializes PointCloud
@@ -248,117 +249,96 @@ void PointCloud::save_as_ply(const char* file_name) {
 	fclose(fp_ply);
 }
 
+// Compute normal
+XYZ PointCloud::compute_normal(TRIANGLE triangle) {
+    XYZ ab, bc;
+    ab.x = triangle.p[1].x - triangle.p[0].x;
+    ab.y = triangle.p[1].y - triangle.p[0].y;
+    ab.z = triangle.p[1].z - triangle.p[0].z;
+    bc.x = triangle.p[2].x - triangle.p[1].x;
+    bc.y = triangle.p[2].y - triangle.p[1].y;
+    bc.z = triangle.p[2].z - triangle.p[1].z;
+
+    XYZ normal;
+    normal.x = (ab.y * bc.z) - (ab.z * bc.y);
+    normal.y = (ab.z * bc.x) - (ab.x * bc.z);
+    normal.z = (ab.x * bc.y) - (ab.y * bc.x);
+
+    double length = pow( ( normal.x * normal.x ) + ( normal.y * normal.y ) + ( normal.z * normal.z ), 0.5 );
+    normal.x /= length;
+    normal.y /= length;
+    normal.z /= length;
+
+    return normal;
+}
 // Save point clouds as STL file with surface reconstruction
 void PointCloud::save_as_stl(const char* file_name) {
     FILE *fp_stl = fopen(file_name, "w");
+
+    TRIANGLE triangles[5];
+    GRIDCELL grid;
 
     // Write STL file header
     fprintf(fp_stl,"solid result-ascii\n");
     
     // Write normal and vertex
-    for (int z=1; z<SIZE-1; z++) {
-        for (int y=1; y<SIZE-1; y++) {
-            for (int x=1; x<SIZE-1; x++) {
-                if (point_cloud_data(x,y,z) == 1) {
+    for (int z=0; z<SIZE-1; z++) {
+        for (int y=0; y<SIZE-1; y++) {
+            for (int x=0; x<SIZE-1; x++) {
 
-                    if (point_cloud_data(x,y,z+1) == 0) {
-                        fprintf(fp_stl,"facet normal 0 0 1\n");
-                        fprintf(fp_stl,"outer loop\n");
-                        fprintf(fp_stl,"vertex %f %f %f\n", (x+0)*SCALE, (y+0)*SCALE, (z+1)*SCALE);
-                        fprintf(fp_stl,"vertex %f %f %f\n", (x+1)*SCALE, (y+0)*SCALE, (z+1)*SCALE);
-                        fprintf(fp_stl,"vertex %f %f %f\n", (x+0)*SCALE, (y+1)*SCALE, (z+1)*SCALE);
-                        fprintf(fp_stl,"endloop\n");
-                        fprintf(fp_stl,"endfacet\n");
-                        fprintf(fp_stl,"facet normal 0 0 1\n");
-                        fprintf(fp_stl,"outer loop\n");
-                        fprintf(fp_stl,"vertex %f %f %f\n", (x+1)*SCALE, (y+1)*SCALE, (z+1)*SCALE);
-                        fprintf(fp_stl,"vertex %f %f %f\n", (x+0)*SCALE, (y+1)*SCALE, (z+1)*SCALE);
-                        fprintf(fp_stl,"vertex %f %f %f\n", (x+1)*SCALE, (y+0)*SCALE, (z+1)*SCALE);
-                        fprintf(fp_stl,"endloop\n");
-                        fprintf(fp_stl,"endfacet\n");
-                    }
+                grid.p[0].x = x; 
+                grid.p[0].y = y; 
+                grid.p[0].z = z;
+                grid.val[0] = point_cloud_data(x, y, z);
 
-                    if (point_cloud_data(x+1,y,z) == 0) {
-                        fprintf(fp_stl,"facet normal 1 0 0\n");
-                        fprintf(fp_stl,"outer loop\n");
-                        fprintf(fp_stl,"vertex %f %f %f\n", (x+1)*SCALE, (y+0)*SCALE, (z+1)*SCALE);
-                        fprintf(fp_stl,"vertex %f %f %f\n", (x+1)*SCALE, (y+0)*SCALE, (z+0)*SCALE);
-                        fprintf(fp_stl,"vertex %f %f %f\n", (x+1)*SCALE, (y+1)*SCALE, (z+1)*SCALE);
-                        fprintf(fp_stl,"endloop\n");
-                        fprintf(fp_stl,"endfacet\n");
-                        fprintf(fp_stl,"facet normal 1 0 0\n");
-                        fprintf(fp_stl,"outer loop\n");
-                        fprintf(fp_stl,"vertex %f %f %f\n", (x+1)*SCALE, (y+1)*SCALE, (z+0)*SCALE);
-                        fprintf(fp_stl,"vertex %f %f %f\n", (x+1)*SCALE, (y+1)*SCALE, (z+1)*SCALE);
-                        fprintf(fp_stl,"vertex %f %f %f\n", (x+1)*SCALE, (y+0)*SCALE, (z+0)*SCALE);
-                        fprintf(fp_stl,"endloop\n");
-                        fprintf(fp_stl,"endfacet\n");
-                    }
+                grid.p[1].x = x+1;
+                grid.p[1].y = y;
+                grid.p[1].z = z;
+                grid.val[1] = point_cloud_data(x+1, y, z);
 
-                    if (point_cloud_data(x,y,z-1) == 0) {
-                        fprintf(fp_stl,"facet normal 0 0 -1\n");
-                        fprintf(fp_stl,"outer loop\n");
-                        fprintf(fp_stl,"vertex %f %f %f\n", (x+1)*SCALE, (y+0)*SCALE, (z+0)*SCALE);
-                        fprintf(fp_stl,"vertex %f %f %f\n", (x+0)*SCALE, (y+0)*SCALE, (z+0)*SCALE);
-                        fprintf(fp_stl,"vertex %f %f %f\n", (x+1)*SCALE, (y+1)*SCALE, (z+0)*SCALE);
-                        fprintf(fp_stl,"endloop\n");
-                        fprintf(fp_stl,"endfacet\n");
-                        fprintf(fp_stl,"facet normal 0 0 -1\n");
-                        fprintf(fp_stl,"outer loop\n");
-                        fprintf(fp_stl,"vertex %f %f %f\n", (x+0)*SCALE, (y+1)*SCALE, (z+0)*SCALE);
-                        fprintf(fp_stl,"vertex %f %f %f\n", (x+1)*SCALE, (y+1)*SCALE, (z+0)*SCALE);
-                        fprintf(fp_stl,"vertex %f %f %f\n", (x+0)*SCALE, (y+0)*SCALE, (z+0)*SCALE);
-                        fprintf(fp_stl,"endloop\n");
-                        fprintf(fp_stl,"endfacet\n");
-                    }
+                grid.p[2].x = x+1;
+                grid.p[2].y = y+1;
+                grid.p[2].z = z;
+                grid.val[2] = point_cloud_data(x+1, y+1, z);
 
-                    if (point_cloud_data(x-1,y,z) == 0) {
-                        fprintf(fp_stl,"facet normal -1 0 0\n");
-                        fprintf(fp_stl,"outer loop\n");
-                        fprintf(fp_stl,"vertex %f %f %f\n", (x+0)*SCALE, (y+0)*SCALE, (z+0)*SCALE);
-                        fprintf(fp_stl,"vertex %f %f %f\n", (x+0)*SCALE, (y+0)*SCALE, (z+1)*SCALE);
-                        fprintf(fp_stl,"vertex %f %f %f\n", (x+0)*SCALE, (y+1)*SCALE, (z+0)*SCALE);
-                        fprintf(fp_stl,"endloop\n");
-                        fprintf(fp_stl,"endfacet\n");
-                        fprintf(fp_stl,"facet normal -1 0 0\n");
-                        fprintf(fp_stl,"outer loop\n");
-                        fprintf(fp_stl,"vertex %f %f %f\n", (x+0)*SCALE, (y+1)*SCALE, (z+1)*SCALE);
-                        fprintf(fp_stl,"vertex %f %f %f\n", (x+0)*SCALE, (y+1)*SCALE, (z+0)*SCALE);
-                        fprintf(fp_stl,"vertex %f %f %f\n", (x+0)*SCALE, (y+0)*SCALE, (z+1)*SCALE);
-                        fprintf(fp_stl,"endloop\n");
-                        fprintf(fp_stl,"endfacet\n");
-                    }
+                grid.p[3].x = x;
+                grid.p[3].y = y+1;
+                grid.p[3].z = z;
+                grid.val[3] = point_cloud_data(x, y+1, z);
 
-                    if (point_cloud_data(x,y+1,z) == 0) {
-                        fprintf(fp_stl,"facet normal 0 1 0\n");
-                        fprintf(fp_stl,"outer loop\n");
-                        fprintf(fp_stl,"vertex %f %f %f\n", (x+0)*SCALE, (y+1)*SCALE, (z+1)*SCALE);
-                        fprintf(fp_stl,"vertex %f %f %f\n", (x+1)*SCALE, (y+1)*SCALE, (z+1)*SCALE);
-                        fprintf(fp_stl,"vertex %f %f %f\n", (x+0)*SCALE, (y+1)*SCALE, (z+0)*SCALE);
-                        fprintf(fp_stl,"endloop\n");
-                        fprintf(fp_stl,"endfacet\n");
-                        fprintf(fp_stl,"facet normal 0 1 0\n");
-                        fprintf(fp_stl,"outer loop\n");
-                        fprintf(fp_stl,"vertex %f %f %f\n", (x+1)*SCALE, (y+1)*SCALE, (z+0)*SCALE);
-                        fprintf(fp_stl,"vertex %f %f %f\n", (x+0)*SCALE, (y+1)*SCALE, (z+0)*SCALE);
-                        fprintf(fp_stl,"vertex %f %f %f\n", (x+1)*SCALE, (y+1)*SCALE, (z+1)*SCALE);
-                        fprintf(fp_stl,"endloop\n");
-                        fprintf(fp_stl,"endfacet\n");
-                    }
+                grid.p[4].x = x;
+                grid.p[4].y = y;
+                grid.p[4].z = z+1;
+                grid.val[4] = point_cloud_data(x, y, z+1);
 
-                    if (point_cloud_data(x,y-1,z) == 0) {
-                        fprintf(fp_stl,"facet normal 0 -1 0\n");
+                grid.p[5].x = x+1;
+                grid.p[5].y = y;
+                grid.p[5].z = z+1;
+                grid.val[5] = point_cloud_data(x+1, y, z+1);
+
+                grid.p[6].x = x+1;
+                grid.p[6].y = y+1;
+                grid.p[6].z = z+1;
+                grid.val[6] = point_cloud_data(x+1, y+1, z+1);
+                
+                grid.p[7].x = x;
+                grid.p[7].y = y+1;
+                grid.p[7].z = z+1;
+                grid.val[7] = point_cloud_data(x, y+1, z+1);
+
+                int ret = Polygonise(grid, 1, triangles);
+                for (int i=0; i<ret; i++) {
+
+                    XYZ normal = compute_normal(triangles[i]);
+                    if (!isnan(normal.x)) {
+                        fprintf(fp_stl,"facet normal %g %g %g\n", normal.x, normal.y, normal.z);
                         fprintf(fp_stl,"outer loop\n");
-                        fprintf(fp_stl,"vertex %f %f %f\n", (x+1)*SCALE, (y+0)*SCALE, (z+1)*SCALE);
-                        fprintf(fp_stl,"vertex %f %f %f\n", (x+0)*SCALE, (y+0)*SCALE, (z+1)*SCALE);
-                        fprintf(fp_stl,"vertex %f %f %f\n", (x+1)*SCALE, (y+0)*SCALE, (z+0)*SCALE);
-                        fprintf(fp_stl,"endloop\n");
-                        fprintf(fp_stl,"endfacet\n");
-                        fprintf(fp_stl,"facet normal 0 -1 0\n");
-                        fprintf(fp_stl,"outer loop\n");
-                        fprintf(fp_stl,"vertex %f %f %f\n", (x+0)*SCALE, (y+0)*SCALE, (z+0)*SCALE);
-                        fprintf(fp_stl,"vertex %f %f %f\n", (x+1)*SCALE, (y+0)*SCALE, (z+0)*SCALE);
-                        fprintf(fp_stl,"vertex %f %f %f\n", (x+0)*SCALE, (y+0)*SCALE, (z+1)*SCALE);
+
+                        for (int j=0;j<3;j++) {
+                            //triangles
+                            fprintf(fp_stl,"vertex %g %g %g\n", triangles[i].p[j].x*SCALE, triangles[i].p[j].y*SCALE, triangles[i].p[j].z*SCALE);
+                        }
+
                         fprintf(fp_stl,"endloop\n");
                         fprintf(fp_stl,"endfacet\n");
                     }

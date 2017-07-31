@@ -57,6 +57,7 @@ public:
 private:
     // 3D grid representing object space
     bitset<PCD_SIZE*PCD_SIZE*PCD_SIZE> point_cloud_data;
+    XYZ compute_normal(TRIANGLE triangle);
 };
 
 #endif
