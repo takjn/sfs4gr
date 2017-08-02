@@ -42,8 +42,7 @@
 #define CAMERA_FY 365.519979    // Focal length(fy)
 
 // 3D reconstruction Parameters
-#define SILHOUETTE_COUNTS           40  // number of silhouette to use
-#define SILHOUETTE_THRESH_BINARY    30  // threshold value for silhouette detection
+#define SILHOUETTE_COUNTS   40  // number of silhouette to use
 
 // Stepper motor parameters (Depends on your stepper motor)
 #define STEPPER_DIRECTION   1       // Direction (0 or 1)
@@ -56,15 +55,12 @@
 // Defines pins numbers (Depends on your circuit design)
 DigitalOut  a4988_step(D8);     // Connect the pin to A4988 step
 DigitalOut  a4988_dir(D9);      // Connect the pin to A4988 dir
-DigitalIn   button0(D4);        // Connect the pin to SW1
-DigitalIn   button1(D6);        // Connect the pin to SW2
-DigitalOut  led_ready(D5);      // Connect the pin to LED1 (ready)
-DigitalOut  led_working(D7);    // Connect the pin to LED2 (working)
+DigitalIn   button0(D6);        // Connect the pin to SW1
+DigitalOut  led_working(D7);    // Connect the pin to LED1 (working)
 DigitalOut  led1(LED1);         // Use onboard LED for debugging purposes
 
 // Global variable for 3D reconstruction
 PointCloud point_cloud;      // Point cloud (3D reconstruction result)
-cv::Mat img_background;      // Background image
 
 int reconst_index = 1;
 int file_name_index = 1;
@@ -94,15 +90,9 @@ int projection(double rad, double Xw, double Yw,double Zw, int &u, int &v)
 // Voxel based "Shape from silhouette"
 // Only voxels that lie inside all silhouette volumes remain part of the final shape.
 void shape_from_silhouette(double rad) {
-    // Take a video frame in grayscale (cf. camera_if.cpp)
-    cv::Mat img_silhouette;
-    create_gray(img_silhouette);
 
-    // Background subtraction
-    cv::absdiff(img_silhouette, img_background, img_silhouette);
-
-    // Get a silhouette
-    cv::threshold(img_silhouette, img_silhouette, SILHOUETTE_THRESH_BINARY, 255, cv::THRESH_BINARY);
+    // Take a silhouette
+    cv::Mat img_silhouette = get_silhouette();
 
     // Saves a silhouette image for dubugging purposes
     // sprintf(file_name, "/storage/img_%d.bmp", file_name_index);
@@ -170,21 +160,6 @@ int main() {
         storage.wait_connect();
 
         if (button0 == 0) {
-            // Take a video frame in grayscale and set as a background image
-            led_working = 1;
-            create_gray(img_background);
-
-            // Save a background image to a storage
-            sprintf(file_name, "/storage/img_%d.jpg", file_name_index++);
-            save_image_jpg(file_name); // save as jpeg
-            printf("Saved file %s\r\n", file_name);
-
-            led_working = 0;
-            led_ready = 1;
-
-            wait_ms(100);
-        }
-        if (button1 == 0 && !img_background.empty()) {
             // Scan 3D object with camera
             // Repeat taking a image and 3D reconstruction while rotating the turntable.
             for (int i = 0; i < SILHOUETTE_COUNTS; i++) {

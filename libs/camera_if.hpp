@@ -88,6 +88,13 @@ uint8_t* get_jpeg_adr();
 void create_gray(cv::Mat &img_gray);
 
 /**
+* @brief	Takes a silhouette
+* @param	None
+* @return	Silhouette image
+*/
+cv::Mat get_silhouette();
+
+/**
 * @brief	Save jpeg to storage
 * @param	file_name	name of file
 * @return	None

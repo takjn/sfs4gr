@@ -206,6 +206,38 @@ void create_gray(Mat &img_gray)
     cvtColor(img_yuv, img_gray, COLOR_YUV2GRAY_YUY2);
 }
 
+/* Takes a silhouette */
+cv::Mat get_silhouette() {
+    Mat img_silhouette(VIDEO_PIXEL_VW, VIDEO_PIXEL_HW, CV_8U);
+
+    // Transform buffer into OpenCV matrix
+    Mat img_yuv(VIDEO_PIXEL_VW, VIDEO_PIXEL_HW, CV_8UC2, FrameBuffer_Video);
+
+    // To reduce memory usage, process each row
+    for (int y=0; y<VIDEO_PIXEL_VW; y++) {
+        // Define region of interesting
+        Rect roi(0, y, VIDEO_PIXEL_HW, 1);
+        Mat img_roi = img_yuv(roi);
+        Mat img_silhouette_roi = img_silhouette(roi);
+
+        // Convert color from YUV to HSV
+        Mat img_rgb;
+        cvtColor(img_roi, img_rgb, COLOR_YUV2RGB_YUY2);
+        Mat img_hsv;
+        cvtColor(img_rgb, img_hsv, COLOR_RGB2HSV);
+
+        // Detect blue color
+        Mat mask;
+        inRange(img_hsv, Scalar(100, 50, 0), Scalar(140, 255, 255), mask);
+
+        // Make a silhouette from blue mask
+        bitwise_not(mask, mask);
+        mask.copyTo(img_silhouette_roi);
+    }
+
+    return img_silhouette;
+}
+
 /* Save jpeg to storage */
 void save_image_jpg(const char* file_name) {
     size_t jcu_encode_size;
