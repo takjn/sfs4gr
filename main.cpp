@@ -33,11 +33,11 @@
 
 // Extrinsic parameters of the camera (Depends on your enclosure design)
 #define CAMERA_DISTANCE 115     // Distance from the origin to the camera (mm)
-#define CAMERA_OFFSET  2        // Height offset of the camera relative to the origin (mm)
+#define CAMERA_OFFSET  -3       // Height offset of the camera relative to the origin (mm)
 
 // Intrinsic parameters of the camera (cf. OpenCV's Camera Calibration)
 #define CAMERA_CENTER_U 324     // Optical centers (cx)
-#define CAMERA_CENTER_V 245     // Optical centers (cy)
+#define CAMERA_CENTER_V 240     // Optical centers (cy)
 #define CAMERA_FX 370.0         // Focal length(fx)
 #define CAMERA_FY 370.0         // Focal length(fy)
 
@@ -72,17 +72,17 @@ static DisplayApp  display_app;
 // Projects a 3D point into camera coordinates
 int projection(double rad, double Xw, double Yw,double Zw, int &u, int &v)
 {
-    // Pitch rotations around the Y axis
-    double Xc= cos(rad)*Xw + sin(rad)*Zw;
-    double Yc= Yw;
-    double Zc=-sin(rad)*Xw + cos(rad)*Zw;
+    // rotate around the Z axis
+    double Xc = cos(rad)*Xw + sin(rad)*Yw;
+    double Yc =-sin(rad)*Xw + cos(rad)*Yw;
+    double Zc = Zw;
 
     // Perspective projection
-    Yc+=CAMERA_OFFSET;
-    Zc-=CAMERA_DISTANCE;
+    Yc -= CAMERA_DISTANCE;
+    Zc += CAMERA_OFFSET;
   
-    u= CAMERA_CENTER_U - (int)((Xc/Zc)*(CAMERA_FX));
-    v= CAMERA_CENTER_V - (int)((Yc/Zc)*(CAMERA_FY));
+    u = CAMERA_CENTER_U - (int)((Xc/Yc)*(CAMERA_FX));
+    v = VIDEO_PIXEL_VW - (CAMERA_CENTER_V - (int)((Zc/Yc)*(CAMERA_FY)));
 
     return (u>0 && u<VIDEO_PIXEL_HW && v>0 && v<VIDEO_PIXEL_VW);
 }
