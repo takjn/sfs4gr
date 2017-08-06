@@ -8,9 +8,9 @@
 */
 
 typedef struct {
-    double x;
-    double y;
-    double z;
+    float x;
+    float y;
+    float z;
 } XYZ;
 
 typedef struct {

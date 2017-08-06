@@ -271,15 +271,21 @@ XYZ PointCloud::compute_normal(TRIANGLE triangle) {
 
     return normal;
 }
+
 // Save point clouds as STL file with surface reconstruction
 void PointCloud::save_as_stl(const char* file_name) {
-    FILE *fp_stl = fopen(file_name, "w");
+    FILE *fp_stl = fopen(file_name, "wb");
+
+    uint8_t header[80] = {0};
+    uint32_t face_count = 0;
+    uint16_t stub = 0;
 
     TRIANGLE triangles[5];
     GRIDCELL grid;
 
     // Write STL file header
-    fprintf(fp_stl,"solid result-ascii\n");
+    fwrite(header, sizeof(header), 1, fp_stl);
+    fwrite(&face_count, sizeof(uint32_t), 1, fp_stl);
     
     // Write normal and vertex
     for (int z=0; z<SIZE-1; z++) {
@@ -331,23 +337,30 @@ void PointCloud::save_as_stl(const char* file_name) {
 
                     XYZ normal = compute_normal(triangles[i]);
                     if (!isnan(normal.x)) {
-                        fprintf(fp_stl,"facet normal %g %g %g\n", normal.x, normal.y, normal.z);
-                        fprintf(fp_stl,"outer loop\n");
+                        // write Normal vector
+                        fwrite(&normal, sizeof(XYZ), 1, fp_stl);
 
+                        // write Vertex
                         for (int j=0;j<3;j++) {
-                            //triangles
-                            fprintf(fp_stl,"vertex %g %g %g\n", triangles[i].p[j].x*SCALE, triangles[i].p[j].y*SCALE, triangles[i].p[j].z*SCALE);
+                            triangles[i].p[j].x *= SCALE;
+                            triangles[i].p[j].y *= SCALE;
+                            triangles[i].p[j].z *= SCALE;
+                            fwrite(&triangles[i].p[j], sizeof(XYZ), 1, fp_stl);
                         }
 
-                        fprintf(fp_stl,"endloop\n");
-                        fprintf(fp_stl,"endfacet\n");
+                        // write unused area
+                        fwrite(&stub, sizeof(uint16_t), 1, fp_stl);
+
+                        face_count++;
                     }
                 }
             }
         }
     }
-    // Write STL file footer
-    fprintf(fp_stl,"endsolid\n");
+    // Write number of triangles
+    fseek(fp_stl, 80, SEEK_SET);
+    fwrite(&face_count, sizeof(uint32_t), 1, fp_stl);
+
     fclose(fp_stl);
 }
 
