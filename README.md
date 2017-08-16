@@ -1,9 +1,7 @@
-# Shape from silhouette on GR-LYCHEE
-GR-LYCHEEのカメラを使った３次元形状復元のサンプルプログラムです。
+# DIY 3D Scanner Based on Shape from silhouette
+GR-LYCHEEのカメラを使った3次元形状復元のサンプルプログラムです。GR-PEACHで作ることもできます。
 
-## アルゴリズム
-Shape from silhouette と呼ばれる手法を使っています。
+ボタンを1つ押すだけで3次元形状の取得から3Dデータの出力までを行います。出力されるファイルはSTLファイルであるため3Dプリンターなどでそのまま使うことができます。
 
-## 出力結果
-処理結果は、点群（Point Cloud）で出力します。
-MeshLabなどのソフトウェアを使うことでSTLファイルといった一般的な３次元データに変換することができます。
+## 使い方
+[がじぇるね工房 - OpenCVで自作3Dスキャナー ](https://tool-cloud.renesas.com/ja/atelier/detail.php?id=67) をご覧ください。
