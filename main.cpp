@@ -33,10 +33,10 @@
 
 // Extrinsic parameters of the camera (Depends on your enclosure design)
 #define CAMERA_DISTANCE 115     // Distance from the origin to the camera (mm)
-#define CAMERA_OFFSET  -3       // Height offset of the camera relative to the origin (mm)
+#define CAMERA_OFFSET  0        // Height offset of the camera relative to the origin (mm)
 
 // Intrinsic parameters of the camera (cf. OpenCV's Camera Calibration)
-#define CAMERA_CENTER_U 324     // Optical centers (cx)
+#define CAMERA_CENTER_U 320     // Optical centers (cx)
 #define CAMERA_CENTER_V 240     // Optical centers (cy)
 #define CAMERA_FX 370.0         // Focal length(fx)
 #define CAMERA_FY 370.0         // Focal length(fy)
